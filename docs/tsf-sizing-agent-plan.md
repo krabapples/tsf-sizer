@@ -22,41 +22,77 @@ Every number in the final report should trace back to a TSF field or a spreadshe
 
 ---
 
-## 2. Architecture
+## 2. Architecture: one Docker container with a web frontend
+
+The whole tool ships as **one Docker image**. A colleague runs it with a single command and opens it in a browser. There are no external services to install besides the LLM endpoint.
 
 ```
-            ┌──────────────┐
- Upload ──▶ │ n8n Form     │  (file upload + optional inputs: growth %, years,
- (.tgz)     │ Trigger      │   decryption planned?, HA pair?, budget tier)
-            └──────┬───────┘
-                   ▼
-            ┌──────────────┐     HTTP     ┌─────────────────────────────┐
-            │ HTTP Request │ ───────────▶ │ tsf-parser (Python/FastAPI) │
-            └──────┬───────┘   JSON back  │ untar → parse XML/CLI → JSON│
-                   ▼                      └─────────────────────────────┘
-            ┌──────────────┐
-            │ Sheets/Excel │  read portfolio spreadsheet → normalize
-            └──────┬───────┘
-                   ▼
-            ┌──────────────┐
-            │ Sizing engine│  (Code node or 2nd endpoint on the Python service)
-            │ filter+rank  │  → candidates + per-metric headroom table
-            └──────┬───────┘
-                   ▼
-            ┌──────────────┐
-            │ AI Agent     │  Claude, with tools: get_metrics, get_model_spec,
-            │ (Claude)     │  compare_models, what_if(growth, decryption, ...)
-            └──────┬───────┘
-                   ▼
-            ┌──────────────┐
-            │ Report       │  HTML/PDF/DOCX proposal + JSON audit trail
-            │ + delivery   │  → email / Slack / Teams / SharePoint
-            └──────────────┘
+┌──────────────────────── docker container: tsf-sizer ────────────────────────┐
+│                                                                             │
+│  Web frontend (browser)                                                     │
+│   • Upload page: drag & drop TSF + optional inputs                          │
+│   • Job progress (parsing → sizing → writing)                               │
+│   • Result page: recommendation, comparison table, interface map,           │
+│     warnings, chat box for what-if questions                                │
+│   • Admin page: upload/refresh portfolio spreadsheet, default parameters    │
+│   • History: previous analyses (per user)                                   │
+│            │  HTTP/JSON                                                     │
+│            ▼                                                                │
+│  Backend: Python + FastAPI                                                  │
+│   ├── parser/     TSF (.tgz) → metrics JSON                                 │
+│   ├── portfolio/  spreadsheet → normalized model catalogue                  │
+│   ├── sizing/     requirements, hard filters, interface matching, ranking   │
+│   ├── llm/        Claude write-up + agent tools for follow-up questions     │
+│   ├── reports/    HTML → PDF (WeasyPrint) and DOCX (python-docx)            │
+│   └── jobs        background worker (in-process), status polling           │
+│            │                                                                │
+│            ▼                                                                │
+│  /data (Docker volume)                                                      │
+│   ├── app.db          SQLite: analyses, audit log, settings                 │
+│   ├── portfolio/      current + previous spreadsheet versions               │
+│   └── tmp/            uploaded TSFs (deleted after processing)              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                     │ HTTPS (only the aggregated metrics JSON)
+                     ▼
+          Approved Claude endpoint (Anthropic API / company tenant / cloud-hosted)
 ```
 
-**Why a separate Python service for parsing:** TSFs are large `.tgz` archives. n8n's Compression node handles zip/gzip but not tar extraction of this size cleanly, and parsing XML and CLI text belongs in unit-tested code. n8n handles orchestration, the upload UI, spreadsheet access, the LLM call and delivery.
+### Technology choices
+| Part | Choice | Why |
+|---|---|---|
+| Backend | Python 3.12 + FastAPI | TSF parsing, XML and spreadsheets are easiest in Python; FastAPI gives a clean JSON API and auto docs |
+| Frontend | React + Vite + Tailwind, built to static files and served by FastAPI | Interactive result page and chat; one origin, no extra web server. *(Simpler option: server-rendered Jinja + HTMX, with no Node build step.)* |
+| Spreadsheet | `openpyxl` / `pandas` | Reads the team's .xlsx directly |
+| LLM | Anthropic Python SDK (Claude) | Tool use for the what-if agent; the endpoint is configurable via env vars |
+| Storage | SQLite on a mounted volume | No database server; survives container restarts |
+| Background jobs | In-process worker (asyncio / thread pool) | TSFs take seconds to a minute to parse; no Redis needed for the MVP |
+| Reports | WeasyPrint (PDF), python-docx (DOCX) | Proposal-ready exports |
+| Image | Multi-stage Dockerfile: Node stage builds the frontend, then a slim Python runtime stage | Small image with nothing to build at runtime; runs as non-root |
 
-*(Alternative without n8n: one Python app (Streamlit UI + Claude API/Agent SDK). The parser and sizing modules are the same either way, so this can be decided later.)*
+### How colleagues run it
+```bash
+# one-time
+docker pull <registry>/tsf-sizer:latest        # or: docker build -t tsf-sizer .
+
+# run
+docker run -d --name tsf-sizer -p 8080:8080 \
+  -e ANTHROPIC_API_KEY=... \
+  -v tsf-sizer-data:/data \
+  <registry>/tsf-sizer:latest
+# → open http://localhost:8080
+```
+A `docker-compose.yml` ships as well, with the same settings and an optional reverse proxy (Caddy/Traefik) for HTTPS when hosted centrally.
+
+**Two deployment modes, same image:**
+1. **Local (per SE laptop):** each person runs it themselves; nothing leaves their machine except the LLM call. Easiest to get started.
+2. **Shared (team server):** one instance on an internal VM with HTTPS and SSO (OIDC via env vars). Everyone uses the same spreadsheet version and history.
+
+### Configuration (env vars)
+`ANTHROPIC_API_KEY` (or the company-endpoint settings), `LLM_MODEL`, `LLM_ENABLED` (false = the tool still sizes, just without a written argument), `AUTH_MODE` (none / basic / oidc), `OIDC_*`, `PORTFOLIO_PATH`, `TSF_RETENTION_HOURS`, `MAX_UPLOAD_MB`.
+
+### How the portfolio spreadsheet gets into the container
+- Upload it on the admin page. The backend validates it, shows a diff against the previous version ("PA-XXXX: max sessions changed"), and stores it versioned in `/data/portfolio/`.
+- Alternatively, mount a file (`-v ./portfolio.xlsx:/data/portfolio/portfolio.xlsx:ro`), or (later) sync from SharePoint/Google Sheets on a schedule.
 
 ---
 
@@ -179,18 +215,28 @@ The `current_model_limit` term enforces the business rule that the new box is ne
   - Say why smaller models were rejected (the first filter each one failed).
   - Surface every warning prominently.
   - Output: an executive summary (3–5 lines), a comparison table, the interface migration map, risks & assumptions, and next steps.
-- **Agent tools** (n8n AI Agent node or Claude tool use) for follow-ups:
+- **Agent tools** (Claude tool use, called from the backend) for follow-ups in the result page's chat box:
   `get_metric(name)`, `get_model_spec(model)`, `compare(model_a, model_b)`, `rerun_sizing(growth, years, target_util, decryption)`.
 - **Guardrail:** after generation, a code check verifies that every model name and number in the text appears in the JSON. If one doesn't, regenerate or flag it.
 
 ---
 
-## 7. Output / UX
+## 7. Web frontend / UX
 
-- **Upload form** (n8n Form Trigger): TSF file, customer name/opportunity ID, optional overrides (growth, years, known peak throughput, decryption planned, HA pair, second TSF for the HA peer).
-- **Report:** HTML shown right away, plus a DOCX/PDF export in PANW proposal style. Include a "Data sources & assumptions" appendix (TSF timestamp, PAN-OS version, sheet version, parameters used).
-- **Delivery:** email to the requester, and optionally save to the opportunity folder (SharePoint/Drive) or post in Teams/Slack.
-- **Human-in-the-loop:** the report is a *draft for the SE*, not sent to the customer automatically.
+- **Upload page:** drag and drop the TSF, plus customer name/opportunity ID and optional overrides (growth, years, target utilization, known peak throughput, decryption planned, HA pair with a second TSF for the peer). The upload streams with a progress bar; big files are fine.
+- **Progress:** each step shows its status (unpacking → parsing → sizing → writing). Parsing results appear before the LLM text is ready.
+- **Result page:**
+  - recommendation card (Good / Better / Best) with a one-line reason each
+  - comparison table (current spec / observed / required / proposed / headroom %), coloured by margin
+  - interface migration map (old port → new port)
+  - warnings and assumptions, prominently shown
+  - "rejected models" section with the reason for each
+  - sliders to change growth/years/utilization, which re-run the sizing instantly (no LLM needed)
+  - chat box for questions ("what if they enable decryption on all outbound traffic?")
+  - export buttons: PDF, DOCX, JSON (audit trail)
+- **History:** earlier analyses, searchable by customer or opportunity.
+- **Admin:** portfolio spreadsheet upload with diff and version history, default parameters, retention settings.
+- **Human-in-the-loop:** the report is a *draft for the SE*, never sent to the customer automatically.
 
 ---
 
@@ -199,10 +245,11 @@ The `current_model_limit` term enforces the business rule that the new box is ne
 TSFs contain sensitive customer data: IP plans, rule bases, usernames, certificates and possibly hashed credentials and keys.
 
 - Check **PANW's internal policy on AI tools and customer data** first: which LLM endpoints are approved (e.g., an enterprise Claude tenant or cloud-hosted Claude under a company agreement), and whether customer TSFs may be processed at all.
-- Run parsing **inside company-controlled infrastructure** (self-hosted n8n + parser service, not n8n Cloud on a personal account).
+- Run the container **inside company-controlled infrastructure**: an SE laptop or an internal VM, not a public cloud host on a personal account.
 - **Data minimization:** only aggregated counts and metrics (§5.4 JSON) go to the LLM. No IPs, names, rule contents or secrets.
 - Delete the uploaded TSF and extracted files once processing finishes (or after N days), and log who uploaded what.
-- Put SSO or at least authentication in front of the upload form.
+- In shared mode, require login (OIDC/SSO) and scope history per user. Local mode binds to `localhost` only by default.
+- Harden the container: non-root user, read-only root filesystem except `/data`, safe tar extraction (size and file-count limits, no path traversal or symlinks), upload size limit, dependency and image scanning in CI.
 - Check whether an existing internal tool already parses TSFs (e.g., the tooling behind the Best Practice Assessment) and could supply a parser or metric definitions to reuse.
 
 ---
@@ -214,9 +261,9 @@ TSFs contain sensitive customer data: IP plans, rule bases, usernames, certifica
 | **0. Discovery** (1 wk) | Collect sample TSFs + spreadsheet; map metric → file path per PAN-OS version; agree on the canonical schema and default sizing parameters with 1–2 senior SEs; get security sign-off | Metric map + schema doc approved |
 | **1. Parser** (1–2 wk) | Python `tsf-parser`: untar, parse config XML + CLI outputs, Panorama-pushed merge, interface inventory → JSON. Unit tests per sample TSF | Parser output matches manual extraction on every sample |
 | **2. Portfolio + sizing engine** (1 wk) | Spreadsheet loader + mapping YAML + normalization; requirement calc, hard filters, interface assignment, ranking | On 10+ historical deals the engine picks the model the SE chose, or a defensible one |
-| **3. n8n workflow MVP** (1 wk) | Form upload → parser → sizing → Claude write-up → HTML/email | End-to-end run < 2 min on a real TSF |
-| **4. Agent + what-if** (1 wk) | AI Agent with tools, chat follow-ups, number-verification guardrail | SEs can ask "what if +50% growth" and get a consistent answer |
-| **5. Hardening** (ongoing) | DOCX/PDF template, HA pair / multi-firewall consolidation, VM-Series sizing (vCPU-based), audit log, retention, feedback button ("recommendation was right/wrong") | Pilot with 3–5 SEs, feedback loop in place |
+| **3. Container + web MVP** (1–2 wk) | FastAPI endpoints, background jobs, upload and result pages, Claude write-up, Dockerfile + compose, SQLite history | `docker run` → upload a real TSF → report in < 2 min, on a colleague's laptop |
+| **4. Agent + what-if** (1 wk) | Chat box with Claude tool use, parameter sliders, number-verification guardrail, PDF/DOCX export | SEs can ask "what if +50% growth" and get a consistent answer |
+| **5. Hardening** (ongoing) | Shared-server mode with SSO, image published to an internal registry via CI, HA pair / multi-firewall consolidation, VM-Series sizing (vCPU-based), audit log, retention, feedback button ("recommendation was right/wrong") | Pilot with 3–5 SEs, feedback loop in place |
 
 ---
 
@@ -232,25 +279,39 @@ TSFs contain sensitive customer data: IP plans, rule bases, usernames, certifica
 ## 11. Suggested repo layout
 
 ```
-tsf-sizing-agent/
-├── parser/                 # Python package: tsf → metrics JSON
-│   ├── extract.py          # safe tar extraction (size limits, path traversal checks)
-│   ├── config_xml.py       # object/rule/interface counts from running config
-│   ├── cli_outputs.py      # session info, resource monitor, interface status
-│   ├── panorama_merge.py
-│   └── tests/fixtures/     # sanitized sample TSF extracts
-├── portfolio/
-│   ├── mapping.yaml        # sheet column → canonical schema
-│   └── loader.py
-├── sizing/
-│   ├── requirements.py
-│   ├── filters.py
-│   ├── interfaces.py       # port assignment solver
-│   └── rank.py
-├── service/app.py          # FastAPI: /parse, /size, /compare
-├── n8n/workflow.json       # exported n8n workflow
-├── prompts/report_system_prompt.md
-└── eval/golden_set/
+tsf-sizer/
+├── backend/
+│   ├── app/
+│   │   ├── main.py             # FastAPI app, serves API + built frontend
+│   │   ├── api/                # routes: /analyses, /portfolio, /chat, /settings
+│   │   ├── jobs.py             # background job runner + status
+│   │   ├── db.py               # SQLite models (SQLModel)
+│   │   └── config.py           # env-var settings
+│   ├── parser/                 # TSF → metrics JSON
+│   │   ├── extract.py          # safe tar extraction (size limits, path traversal checks)
+│   │   ├── config_xml.py       # object/rule/interface counts from running config
+│   │   ├── cli_outputs.py      # session info, resource monitor, interface status
+│   │   └── panorama_merge.py
+│   ├── portfolio/
+│   │   ├── mapping.yaml        # sheet column → canonical schema
+│   │   └── loader.py
+│   ├── sizing/
+│   │   ├── requirements.py
+│   │   ├── filters.py
+│   │   ├── interfaces.py       # port assignment solver
+│   │   └── rank.py
+│   ├── llm/
+│   │   ├── report.py           # write-up generation + number check
+│   │   ├── agent.py            # tool-use loop for chat
+│   │   └── prompts/
+│   ├── reports/                # PDF/DOCX templates
+│   └── tests/                  # fixtures: sanitized sample TSF extracts, golden set
+├── frontend/                   # React + Vite + Tailwind
+│   └── src/pages/              # Upload, Progress, Result, History, Admin
+├── Dockerfile                  # multi-stage: build frontend → slim Python runtime
+├── docker-compose.yml
+├── .env.example
+└── README.md                   # how to run in 2 commands
 ```
 
 ---
