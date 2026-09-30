@@ -2,7 +2,8 @@
 *.xls
 *.tgz
 *.tar.gz
-data/
+/data/
+/backend/data/
 *.db
 __pycache__/
 .pytest_cache/
