@@ -132,20 +132,88 @@ Step 0 is to **collect 10–20 real TSFs** (sanitized, from different models, PA
 
 ---
 
-## 4. The portfolio spreadsheet
+## 4. Portfolio data: import the capacity spreadsheet into a database
 
-Make the spreadsheet machine-readable **without changing how the team maintains it**:
+The source is the PLM **"Features & Capacities"** workbook (e.g. `Features_Capacities_12_1_2_Orion.xlsx`), one workbook per PAN-OS release. The team keeps maintaining the spreadsheet as it does today; the tool **imports** it into SQLite and the sizing engine reads only the database.
 
-1. Define a **canonical schema**, one row per model, with columns such as:
-   - `model`, `family`, `form_factor_ru`, `status` (current / EoS / EoL), `eos_date`
-   - Throughput: `fw_throughput_gbps`, `threat_throughput_gbps`, `ipsec_vpn_gbps`, `decryption_throughput_gbps` (if kept)
-   - `max_sessions`, `new_sessions_per_sec`, `max_decryption_sessions`
-   - Objects: `max_address_objects`, `max_address_groups`, `max_service_objects`, `max_security_rules`, `max_nat_rules`, `max_decryption_rules`, `max_zones`, `max_virtual_routers`, `max_ipsec_tunnels`, `max_gp_users`, `max_vsys_base`, `max_vsys_licensed`, …
-   - Interfaces: `ports_1g_copper`, `ports_1g_sfp`, `ports_10g_sfpplus`, `ports_25g_sfp28`, `ports_40g_qsfp`, `ports_100g_qsfp28`, `dedicated_ha_ports`, `sfpplus_supports_1g` (true/false), …
-   - `list_price` or `price_tier` (optional, for ranking)
-2. Write a **column-mapping config** (YAML) from the team's column headers to this schema, so a renamed column doesn't break the tool.
-3. Normalize units (Mbps→Gbps, "64K"→64000, "N/A"→null) and **fail loudly** on an unparseable cell instead of guessing.
-4. Keep the sheet in one place (SharePoint/OneDrive Excel or Google Sheets) and record the sheet version/date in every report.
+### 4.1 What the workbook looks like (12.1.2)
+- Sheet `12.1.2 L2- L7`: **models as columns** (45 columns) and **~250 capacity attributes as rows**, grouped into category sections (Performance, Policy, Objects, Interfaces, NAT, HA, …).
+- Other sheets: `Summary` (platform families and QA status, including which platforms are **NPI**), `12.1.2-Bugs` and `ChangeControl`. These are metadata and are not needed for sizing.
+- Cell values are mixed. Of about 11,000 cells:
+  - ~4,200 plain numbers and ~3,600 Yes/No
+  - ~2,000 not applicable (`-`, `N/A`)
+  - ~130 throughputs with units (`1.5 Tbps`, `650 Mbps`); some throughput cells are bare numbers that mean Gbps
+  - ~40 with K/M suffixes (`4M`, `16K`)
+  - ~500 free-text values: `System`, `Configurable`, `Based on MPC`, `2x1G/10G`, `A/P only`, `60W`, and values with bug references such as `16000 (PAN-255203)`
+- **Orange-filled cells (~250) mean "not tested / not confirmed, treat as TBD".** That colour carries information and must be imported.
+- Attribute names are not unique (e.g. "SSL Certificate Cache" appears twice, "Per-application scanning options" under Anti-Spyware and Antivirus), so the key must be *category + attribute*.
+- Some columns are not standalone models: chassis cards (PA-7500 MPC/NPC/DPC, PA-5450 MPC/NC/DPC), or two models in one column (`PA-450R and PA-450R-5G`).
+- The workbook only covers the **current** portfolio. Many installed boxes (PA-3200, PA-5200, PA-800, …) are not in it, but the sizing rule needs the current model's limits as a baseline. Older release workbooks or legacy datasheets must be imported too.
+
+### 4.2 Why a database (instead of reading the xlsx on every run)
+1. **Parse once, validate once.** Unit and format cleanup happens at import, with a report of every cell that could not be parsed. Runs never guess.
+2. **Keeps the "unconfirmed" (orange) flag** per value, so a recommendation that depends on an unconfirmed number is flagged.
+3. **Versioning:** keep 12.1.2, 12.1.5, … side by side, show what changed between imports, and record exactly which sheet version each recommendation used.
+4. **Multiple sources in one catalogue:** the current PLM workbook, older workbooks and legacy datasheets for EoL models, plus the team's own metadata (release status, form factor, price tier), without editing the PLM file.
+5. **Mapping in one place:** a table links TSF metrics to capacity attributes, so the engine is generic instead of hard-coded per attribute.
+6. Fast filtering for the web UI and for the agent's tools (`get_model_spec`, `compare`).
+
+### 4.3 Schema (SQLite)
+```
+source_document   id, filename, panos_release, sheet_name, imported_at, imported_by, sha256
+model             id, name, family, kind (appliance|chassis|card|vm), parent_model_id,
+                  lifecycle (current|npi|eos|eol), eos_date, form_factor_ru, price_tier,
+                  customer_quotable (bool)
+attribute         id, category, name, canonical_key (e.g. objects.max_address_entries),
+                  unit, value_type (number|throughput|bool|text), direction (higher_is_better),
+                  sizing_relevant (bool)
+capacity_value    model_id, attribute_id, source_document_id,
+                  raw_value, num_value, bool_value, text_value, unit,
+                  special (system_limit|configurable|not_applicable|see_parent|null),
+                  unconfirmed (bool: orange cell), note (e.g. "PAN-255203")
+tsf_metric_map    tsf_metric (e.g. config.address_objects), attribute_id,
+                  compare_as (count|throughput|ports|feature), notes
+interface_port    model_id, speed_class (1G_CU|1G_SFP|10G|25G|40G|100G|400G), count,
+                  supports_lower_speeds (bool), source   # derived from the "Traffic - …" rows
+```
+
+### 4.4 Importer rules
+- Normalize throughput to **Gbps**: `Tbps` ×1000, `Mbps` ÷1000, and a bare number in a throughput row counts as Gbps (flagged in the report).
+- `K` ×1,000, `M` ×1,000,000. Strip a bug suffix (`16000 (PAN-255203)` → 16000, with the note kept).
+- `-`, `N/A`, `NA` → not applicable; `System` / `System Limit` → falls back to the system-wide attribute; `Configurable` → no fixed limit; `Based on MPC/NCs` → take the value from the chassis card rows.
+- Read the cell fill: `FFFF9900` (orange) → `unconfirmed = true`.
+- Split combined columns (`PA-450R and PA-450R-5G`) into two models; link chassis cards to their parent.
+- Interface rows (`Traffic - SFP+ (10G)`, …) become `interface_port` rows for the port-matching solver.
+- Every import produces a report: counts per value type, unparsed cells, and a diff against the previous import. An admin confirms it before the new version becomes active.
+
+### 4.5 Attributes that can be compared against a TSF
+Only part of the ~250 rows is measurable in a TSF. The first version of `tsf_metric_map`:
+
+| TSF metric | Capacity attribute |
+|---|---|
+| Peak throughput (threat subscriptions active) | Threat prevention throughput (appmix) |
+| Peak throughput (no threat subscriptions) | App-ID firewall throughput (appmix) |
+| IPSec throughput | IPSec VPN throughput |
+| Peak CPS | Connections per second |
+| Peak / max sessions | Max sessions for L7 inspection (validate which session row the team uses) |
+| Security / decryption / app-override / PBF / DoS / QoS / SD-WAN rules | Security rulebase, SSL decryption rulebase, App Override rulebase, Policy Based Forwarding, DoS Protection, Number of QoS policies, SD-WAN Rules |
+| NAT rules (split static / DIP / DIPP) | NAT rule capacity, Max NAT rules (static/DIP/DIPP) |
+| Address objects / groups, service objects / groups, FQDN objects | Max address entries / groups, Max services entries / groups, FQDN |
+| EDLs (count, IPs, domains, URLs) | EDL rows |
+| Security profiles, custom App-IDs, custom URL categories | Max security profiles, Custom App-IDs, Max custom categories |
+| Zones, VRs/logical routers, vsys, virtual wires | Max security zones, Max VRs, Max virtual systems, Max virtual wires |
+| Subinterfaces, tunnel interfaces, aggregates and members | Max interfaces (ifNet), Tunnel interfaces, Maximum aggregate interfaces / members |
+| IPSec tunnels, IKE gateways | IPSec VPN (Site-to-site) / GRE Tunnels |
+| GP gateways, GP concurrent users | Max number of GP Gateways, GlobalProtect Client VPN |
+| Route table size, routing peers, BFD | Forwarding table size, Max routing peers, BFD sessions |
+| User-ID mappings, TS agents | User IP Mappings, Terminal Server Agents |
+| Used physical ports per speed | `interface_port` |
+| Features in use (HA mode, GTP/SCTP, HSM, decryption, NGFW clustering) | Yes/No feature rows |
+
+### 4.6 Handling rules for this data
+- **NPI / unreleased models** (marked NPI on the `Summary` sheet): excluded from recommendations by default (`customer_quotable = false`). Enable them per model only once they are announced.
+- **Unconfirmed values** can be used, but the report shows a warning next to them.
+- **The workbook is internal** (QA names, bug IDs, unreleased platforms). Never commit it to git or bake it into the Docker image. It is uploaded through the admin page into the `/data` volume, and only the attribute values the sizing needs are sent to the LLM.
 
 ---
 
