@@ -194,6 +194,7 @@ code { font-family: var(--mono); font-size: .85em; background: var(--surface-3);
 .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
 .btn-on-dark { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.22); backdrop-filter: blur(8px); }
 .btn-on-dark:hover { background: rgba(255,255,255,.2); }
+.btn-danger-on-dark:hover { background: rgba(220, 38, 38, .85); border-color: rgba(255,255,255,.35); }
 .btn:disabled { opacity: .65; cursor: progress; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;

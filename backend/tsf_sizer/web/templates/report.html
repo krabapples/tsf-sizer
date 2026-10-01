@@ -33,6 +33,9 @@
     <div class="hero-actions no-print">
       <button class="btn btn-on-dark" type="button" onclick="window.print()">{{ icon('printer') }}<span>Print / PDF</span></button>
       <a class="btn btn-on-dark" href="/analyses/{{ a.id }}/report.json">{{ icon('download') }}<span>JSON</span></a>
+      <form method="post" action="/analyses/{{ a.id }}/delete" onsubmit="return confirm('Delete this analysis? This cannot be undone.');">
+        <button class="btn btn-on-dark btn-danger-on-dark" type="submit" title="Delete this analysis">{{ icon('trash') }}<span>Delete</span></button>
+      </form>
     </div>
   </div>
   <div class="hero-meta">
@@ -262,8 +265,5 @@
 <footer class="small muted">
   <p>Sources: {{ v.files_used.values()|join(', ') }}{% if h.config_source and h.config_source not in v.files_used.values() %}, {{ h.config_source }}{% endif %}.
   Capacity data: {{ v.portfolio.filename or '–' }} (PAN-OS {{ v.portfolio.panos_release or '?' }}, imported {{ v.portfolio.imported_at or '?' }}).</p>
-  <form method="post" action="/analyses/{{ a.id }}/delete" class="no-print" onsubmit="return confirm('Delete this analysis?');" style="margin-top:10px">
-    <button class="btn btn-ghost" type="submit">{{ icon('trash') }}<span>Delete this analysis</span></button>
-  </form>
 </footer>
 {% endblock %}
