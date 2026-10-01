@@ -1,0 +1,332 @@
+
+> show admins all
+
+admin
+someone
+
+
+> show clock
+
+Thu Jan 15 10:00:00 CET 2026
+
+
+> show system info
+
+hostname: fw-test-01
+ip-address: 192.0.2.10
+netmask: 255.255.255.0
+default-gateway: 192.0.2.1
+mac-address: 00:00:5e:00:53:01
+time: Thu Jan 15 10:00:00 2026
+uptime: 45 days, 3:20:10
+family: 3400
+model: PA-3430
+serial: 000000000001
+sw-version: 11.1.6
+app-version: 8900-9000
+threat-version: 8900-9000
+multi-vsys: off
+operational-mode: normal
+advanced-routing: on
+cloud-mode: non-cloud
+
+
+> request license info
+
+License entry:
+Feature: Threat Prevention
+Description: Threat Prevention
+Serial: 000000000001
+Issued: January 01, 2025
+Expires: January 01, 2027
+Expired?: no
+
+License entry:
+Feature: WildFire License
+Description: WildFire signature feed
+Serial: 000000000001
+Issued: January 01, 2024
+Expires: January 01, 2025
+Expired?: yes
+
+
+> show counter global
+
+Global counters:
+Elapsed time since last sampling: 100.000 seconds
+
+name                                   value     rate severity  category  aspect    description
+--------------------------------------------------------------------------------
+pkt_recv                           900000000     5000 info      packet    pktproc   Packets received
+session_allocated                    5000000       50 info      session   resource  Sessions allocated
+session_alloc_failure                     12        0 drop      session   resource  Session allocation failure
+flow_tcp_non_syn_drop                  10000        0 drop      flow      parse     Packets dropped: non-SYN TCP without session match
+
+
+> show interface ethernet1/1
+
+--------------------------------------------------------------------------------
+Name: ethernet1/1, ID: 16
+Link status:
+  Runtime link speed/duplex/state: 10000/full/up
+Interface Type :
+  Port Type: SFP+
+Capability : 1Gb/s-full, 10Gb/s-full
+Operation mode: layer3
+--------------------------------------------------------------------------------
+Physical port counters read from MAC:
+--------------------------------------------------------------------------------
+rx-bytes                      3888000000000
+tx-bytes                      1000000000000
+--------------------------------------------------------------------------------
+
+
+> show interface ethernet1/2
+
+--------------------------------------------------------------------------------
+Name: ethernet1/2, ID: 17
+Link status:
+  Runtime link speed/duplex/state: 1000/full/up
+Interface Type :
+  Port Type: RJ45
+Capability : auto, 10Mb/s-full, 100Mb/s-full, 1Gb/s-full, 10Gb/s-full
+Operation mode: layer3
+--------------------------------------------------------------------------------
+Physical port counters read from MAC:
+--------------------------------------------------------------------------------
+rx-bytes                      0
+tx-bytes                      0
+--------------------------------------------------------------------------------
+
+
+> show interface ethernet1/9
+
+Server error : Interface 'ethernet1/9' not found
+
+
+> show session info
+
+target-dp:                                       *.dp0
+--------------------------------------------------------------------------------
+Number of sessions supported:                    2500000
+Number of allocated sessions:                    180000
+Number of active TCP sessions:                   150000
+Number of active UDP sessions:                   30000
+Number of active GTPu sessions:                  0
+Number of active SCTP sessions:                  0
+Session table utilization:                       7%
+Number of sessions created since bootup:         900000000
+Packet rate:                                     450000/s
+Throughput:                                      2400000 kbps
+New connection establish rate:                   9000 cps
+--------------------------------------------------------------------------------
+
+
+> show running resource-monitor
+
+Resource monitoring sampling data (per second):
+
+CPU load sampling by group:
+flow_lookup                    :     3%
+
+CPU load (%) during last 60 seconds:
+core   0   1   2   3
+       *  20  25  22
+       *  21  24  23
+
+Resource utilization (%) during last 60 seconds:
+session:
+  7   7   7
+packet buffer:
+  2   3   2
+
+Resource monitoring sampling data (per minute):
+
+CPU load (%) during last 60 minutes:
+core    0       1       2       3
+     avg max avg max avg max avg max
+       *   *  20  30  22  31  21  29
+       *   *  18  25  19  26  18  27
+
+Resource utilization (%) during last 60 minutes:
+session (average):
+  7   7
+session (maximum):
+  8   8
+packet buffer (average):
+  2   2
+packet buffer (maximum):
+  5   4
+
+Resource monitoring sampling data (per hour):
+
+CPU load (%) during last 24 hours:
+core    0       1       2       3
+     avg max avg max avg max avg max
+       *   *  30  55  31  58  29  54
+       *   *  10  20  11  21  10  19
+
+Resource utilization (%) during last 24 hours:
+session (average):
+  9   5
+session (maximum):
+ 12   6
+
+Resource monitoring sampling data (per day):
+
+CPU load (%) during last 7 days:
+core    0       1       2       3
+     avg max avg max avg max avg max
+       *   *  25  60  26  61  24  59
+
+Resource utilization (%) during last 7 days:
+session (maximum):
+ 14
+
+Resource monitoring sampling data (per week):
+
+CPU load (%) during last 13 weeks:
+core    0       1       2       3
+     avg max avg max avg max avg max
+       *   *  24  71  25  73  23  70
+       *   *  22  65  23  66  22  64
+       *   *   *   *   *   *   *   *
+
+Resource utilization (%) during last 13 weeks:
+session (maximum):
+ 16  15   0
+
+
+> show running security-policy
+
+"Allow web; index: 1" {
+        from trust;
+        to untrust;
+        action allow;
+}
+
+"Allow dns; index: 2" {
+        from trust;
+        to untrust;
+        action allow;
+}
+
+"Deny all; index: 3" {
+        from any;
+        to any;
+        action deny;
+}
+
+
+> show running nat-policy
+
+Nat policy configured on vsys1:
+"Outbound; index: 1" {
+        from trust;
+        to untrust;
+        translate-to "src: ethernet1/1 198.51.100.1(*) (dynamic-ip-and-port) (pool idx: 1)";
+        terminal no;
+}
+
+"Web server; index: 2" {
+        from untrust;
+        to untrust;
+        translate-to "dst: 10.0.0.10 (static)";
+        terminal no;
+}
+
+
+> show running decryption-policy
+
+"Decrypt outbound; index: 1" {
+        from trust;
+        to untrust;
+        action decrypt;
+}
+
+
+> show running dos-policy
+
+
+> show high-availability all
+
+Group 1:
+  Mode: Active-Passive
+  Local Information:
+    Version: 1
+    Mode: Active-Passive
+    State: active (last 45 days)
+    Device Information:
+      Model: PA-3430
+    HA1 Control Link Information:
+      IP Address: 192.0.2.20
+      Interface: ha1-a
+      Link State: Up; Setting: 1Gb/s-full
+    HA2 Data Link Information:
+      IP Address: 192.0.2.30
+      Interface: hsci
+      Link State: Up; Setting: 10Gb/s-full
+  Peer Information:
+    Model: PA-3430
+
+
+> show interface all
+
+total configured hardware interfaces: 4
+
+name                    id    speed/duplex/state            mac address
+--------------------------------------------------------------------------------
+ethernet1/1             16    10000/full/up                 00:00:5e:00:53:11
+ethernet1/2             17    1000/full/up                  00:00:5e:00:53:12
+ethernet1/3             18    ukn/ukn/down((autoneg))       00:00:5e:00:53:13
+tunnel                  4     [n/a]/[n/a]/up                00:00:5e:00:53:04
+
+aggregation groups: 0
+
+
+total configured logical interfaces: 6
+
+name                      id    vsys zone             forwarding               tag    address
+------------------------- ----- ---- ---------------- ------------------------ ------ ------------------
+ethernet1/1               16    1    untrust          lr:default               0      198.51.100.1/24
+ethernet1/2               17    1                     N/A                      0      N/A
+ethernet1/2.10            256   1    trust            lr:default               10     10.0.10.1/24
+ethernet1/2.20            257   1    guest            lr:default               20     10.0.20.1/24
+tunnel                    4     1                     N/A                      0      N/A
+tunnel.1                  258   1    vpn              lr:default               0      N/A
+
+
+> show advanced-routing resource
+
+GLOBAL ROUTING RESOURCE USAGE:
+==========================
+Total IPv4 routes           : 1200
+Total Active IPv4 routes    : 1100
+Total IPv6 routes           : 30
+Total Active IPv6 routes    : 30
+
+
+> show vpn tunnel
+
+Show IPSec tunnel config: Total 2 tunnels found.
+
+
+> show vpn gateway
+
+Show IKE gateway config: Total 2 gateways found.
+
+
+> show global-protect-gateway statistics
+
+Total Current Users: 37
+Total Previous Users: 120
+
+
+> show object registered-ip all option count
+
+Total: 250 registered addresses
+
+
+> show management-server last-committed config-size
+
+2500000 bytes

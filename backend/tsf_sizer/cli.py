@@ -10,6 +10,10 @@ from pathlib import Path
 from . import db
 from .portfolio import catalog
 from .portfolio.importer import AlreadyImportedError, activate, import_workbook
+from .tsf.archive import TsfFormatError, read_tsf
+from .tsf.compare import usage_against_model
+from .tsf.metrics import summarize
+from .tsf.techsupport import parse_techsupport
 
 
 def _cmd_import(args) -> int:
@@ -122,6 +126,85 @@ def _cmd_set_model(args) -> int:
     return 0
 
 
+def _fmt(v) -> str:
+    if v is None:
+        return "-"
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    if isinstance(v, float):
+        return f"{v:g}"
+    return str(v)
+
+
+def _cmd_analyze(args) -> int:
+    try:
+        files = read_tsf(args.tsf)
+    except (TsfFormatError, OSError) as e:
+        print(f"Cannot read TSF: {e}", file=sys.stderr)
+        return 1
+    facts = parse_techsupport(files.text("techsupport"))
+    s = summarize(facts)
+    ha = s.ha
+    print(f"TSF:     {files.source}  (files used: {', '.join(sorted(files.member_names))})")
+    print(f"Model:   {s.model}   PAN-OS {s.panos}   uptime {s.uptime_days} days")
+    print(
+        "HA:      "
+        + (
+            f"{ha.get('mode')} ({ha.get('local_state')}), HA1 on "
+            f"{ha.get('ha1_interface')}, HA2 on {ha.get('ha2_interface')}"
+            if ha.get("enabled")
+            else "not enabled"
+        )
+    )
+    print(f"Sizing basis: {s.sizing_basis.replace('_', ' ')} throughput")
+    print("\nPorts in use:")
+    for p in s.ports:
+        print(f"  {p.name:<14} {p.role:<8} {p.speed_class:<20} zone={p.zone or '-'} link={p.state}")
+
+    report = None
+    conn = db.connect(args.db)
+    try:
+        report = usage_against_model(conn, s, model=args.model)
+    except (LookupError, ValueError) as e:
+        print(f"\n(No comparison with the portfolio: {e})")
+    if report:
+        print(f"\nUsage vs {report.model} capacity (portfolio document {report.document_id}):")
+        print(f"  {'metric':<38} {'observed':>12} {'kind':<9} {'capacity':>12} {'used':>7}")
+        for r in report.rows:
+            used = f"{r.utilization_pct:g}%" if r.utilization_pct is not None else "-"
+            cap = _fmt(r.capacity) if r.capacity is not None else (r.capacity_raw or "-")
+            flag = " [unconfirmed]" if r.unconfirmed else ""
+            print(
+                f"  {r.metric:<38} {_fmt(r.observed):>12} {r.observed_kind:<9} "
+                f"{cap:>12} {used:>7}{flag}"
+            )
+        print(
+            "\n  Ports needed:    " + ", ".join(f"{n}x {c}" for c, n in report.ports_needed.items())
+        )
+        print(
+            "  Ports on model:  "
+            + ", ".join(f"{n}x {c}" for c, n in report.ports_available.items())
+        )
+    print("\nWarnings:")
+    for w in s.warnings + (report.warnings if report else []):
+        print(f"  - {w}")
+    if args.json:
+        import json
+
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            json.dumps(
+                {"summary": s.to_dict(), "usage": report.to_dict() if report else None},
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+        print(f"\nJSON written to {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tsf-sizer")
     p.add_argument("--db", help=f"SQLite path (default $TSF_SIZER_DB or {db.DEFAULT_DB_PATH})")
@@ -150,6 +233,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--category", help="Filter on category (substring)")
     s.add_argument("--document", type=int, help="Document id (default: active)")
     s.set_defaults(func=_cmd_show)
+
+    s = sub.add_parser("analyze-tsf", help="Parse a TSF and compare usage with its model")
+    s.add_argument("tsf", help="TSF .tgz, or the techsupport_*.txt from it")
+    s.add_argument("--model", help="Compare against this model instead of the TSF's own")
+    s.add_argument("--json", help="Also write the full result as JSON")
+    s.set_defaults(func=_cmd_analyze)
 
     s = sub.add_parser("set-model", help="Set team-maintained metadata for a model")
     s.add_argument("model")

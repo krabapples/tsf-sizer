@@ -1,6 +1,6 @@
 # tsf-sizer backend
 
-Python backend for the TSF sizing tool. Only the **portfolio importer** is built so far: it loads the PLM "Features & Capacities" workbook into SQLite. The TSF parser, sizing engine and web frontend come next (see `../docs/tsf-sizing-agent-plan.md`).
+Python backend for the TSF sizing tool. Built so far: the **portfolio importer** (PLM "Features & Capacities" workbook → SQLite) and the **TSF parser** (techsupport CLI output → sizing metrics, compared with the model's own capacities). The sizing engine and web frontend come next (see `../docs/tsf-sizing-agent-plan.md`).
 
 ## Setup
 
@@ -43,6 +43,21 @@ tsf-sizer --db ../data/app.db models [--all]             # quotable models (--al
 tsf-sizer --db ../data/app.db show-model PA-3430 --category objects
 ```
 
+## Analyze a TSF
+
+```bash
+tsf-sizer --db ../data/app.db analyze-tsf <tsf.tgz | techsupport_*.txt> [--json out.json]
+```
+
+Reads only the files it needs from the TSF (streamed, nothing extracted to disk), then shows:
+
+- model, PAN-OS, uptime, HA mode and HA links, which throughput figure to size on
+- ports in use (traffic / HA / unused) with speed class
+- usage against the model's capacities in the active portfolio: sessions, CPS, throughput, all rule types, NAT types, VPN, routes, zones, interfaces
+- warnings: short history after a reboot, snapshot-only values, expired licenses, resource-pressure counters, decryption in use
+
+Peaks come from `show running resource-monitor` (up to 13 weeks, reset by a reboot). Throughput and CPS are snapshots at TSF time; object counts need the config XML (not parsed yet).
+
 ## Team-maintained model metadata
 
 NPI status is read from the workbook's `Summary` sheet. Anything the workbook doesn't say (released after all, end-of-sale date, price tier, rack units) is stored as an override that survives re-imports:
@@ -56,7 +71,7 @@ tsf-sizer --db ../data/app.db set-model PA-3220 --lifecycle eol --eos-date 2025-
 
 ```bash
 pytest                                     # synthetic workbook, no confidential data needed
-PORTFOLIO_XLSX=/path/to/real.xlsx pytest   # also run the check against the real workbook
+PORTFOLIO_XLSX=/path/to/real.xlsx TSF_TECHSUPPORT=/path/to/techsupport.txt pytest   # also check real files
 ruff check . && ruff format --check .
 ```
 
