@@ -56,7 +56,7 @@ Reads only the files it needs from the TSF (streamed, nothing extracted to disk)
 - usage against the model's capacities in the active portfolio: sessions, CPS, throughput, all rule types, NAT types, VPN, routes, zones, interfaces
 - warnings: short history after a reboot, snapshot-only values, expired licenses, resource-pressure counters, decryption in use
 
-Peaks come from `show running resource-monitor` (up to 13 weeks, reset by a reboot). Throughput and CPS are snapshots at TSF time; object counts need the config XML (not parsed yet).
+Peaks come from `show running resource-monitor` (up to 13 weeks, reset by a reboot). Throughput and CPS are snapshots at TSF time. Object, rule and network counts come from the config XML inside the TSF (`.merged-running-config.xml` preferred for Panorama-managed firewalls), or pass one with `--config`.
 
 ## Team-maintained model metadata
 
@@ -71,7 +71,7 @@ tsf-sizer --db ../data/app.db set-model PA-3220 --lifecycle eol --eos-date 2025-
 
 ```bash
 pytest                                     # synthetic workbook, no confidential data needed
-PORTFOLIO_XLSX=/path/to/real.xlsx TSF_TECHSUPPORT=/path/to/techsupport.txt pytest   # also check real files
+PORTFOLIO_XLSX=/path/to/real.xlsx TSF_TECHSUPPORT=/path/to/techsupport.txt TSF_CONFIG=/path/to/config.xml pytest   # also check real files
 ruff check . && ruff format --check .
 ```
 

@@ -10,7 +10,51 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 
+from .config import ConfigCounts
 from .techsupport import TechSupportFacts
+
+# Config counts that map directly to TSF metric keys ("config.<name>").
+CONFIG_METRICS = (
+    "address_objects",
+    "address_groups",
+    "max_address_group_members",
+    "service_objects",
+    "service_groups",
+    "fqdn_objects",
+    "edl_lists",
+    "security_profiles",
+    "custom_apps",
+    "custom_url_categories",
+    "url_list_entries",
+    "zones",
+    "virtual_routers",
+    "vwires",
+    "vsys",
+    "shared_gateways",
+    "logical_interfaces",
+    "tunnel_interfaces",
+    "aggregate_interfaces",
+    "max_aggregate_members",
+    "routing_peers",
+    "dhcp_relay_interfaces",
+    "ipsec_tunnels",
+    "ike_gateways",
+    "gp_gateways",
+    "schedules",
+    "security_rules",
+    "nat_rules",
+    "nat_rules_static",
+    "nat_rules_dip",
+    "nat_rules_dipp",
+    "decryption_rules",
+    "app_override_rules",
+    "auth_rules",
+    "dos_rules",
+    "pbf_rules",
+    "qos_rules",
+    "tunnel_inspection_rules",
+    "sdwan_rules",
+)
 
 SNAPSHOT = "snapshot"  # value at the moment the TSF was taken
 PEAK = "peak"  # highest value in the available history
@@ -48,6 +92,8 @@ class TsfSummary:
     licenses_active: list[str]
     licenses_expired: list[str]
     sizing_basis: str
+    config_source: str | None = None
+    panorama_managed: bool | None = None
     metrics: dict[str, Metric] = field(default_factory=dict)
     ports: list[PortUse] = field(default_factory=list)
     port_counts: dict[str, int] = field(default_factory=dict)
@@ -100,7 +146,9 @@ def _m(metrics, key, value, kind, source, unit=None, note=None):
         metrics[key] = Metric(value, kind, source, unit, note)
 
 
-def summarize(f: TechSupportFacts) -> TsfSummary:
+def summarize(
+    f: TechSupportFacts, config: ConfigCounts | None = None, config_source: str | None = None
+) -> TsfSummary:
     sysinfo = f.system
     uptime_s = sysinfo.get("uptime_seconds")
     lic_active = sorted(x["feature"] for x in f.licenses if not x["expired"])
@@ -270,6 +318,24 @@ def summarize(f: TechSupportFacts) -> TsfSummary:
             None if sysinfo["multi-vsys"] == "off" else "multi-vsys on: count from config",
         )
 
+    # ---- config XML: complete object counts; replaces counts derived from CLI output
+    if config is not None:
+        s.config_source = config_source or "config XML"
+        s.panorama_managed = config.panorama_managed
+        src = s.config_source
+        for name in CONFIG_METRICS:
+            if name not in config.counts:
+                continue
+            key = f"config.{name}"
+            prev = m.get(key)
+            note = None
+            if prev is not None and name.endswith("_rules") and prev.value != config.counts[name]:
+                note = f"running policy shows {prev.value}"
+            m[key] = Metric(config.counts[name], COUNT, src, note=note)
+        for kind in ("ip", "domain", "url"):
+            if config.counts.get(f"edl_lists_{kind}"):
+                _m(m, f"config.edl_lists_{kind}", config.counts[f"edl_lists_{kind}"], COUNT, src)
+
     # ---- features
     if f.ha.get("enabled"):
         mode = (f.ha.get("mode") or "").lower()
@@ -375,8 +441,15 @@ def _warnings(f: TechSupportFacts, s: TsfSummary, uptime_s: int | None) -> list[
         )
     if f.missing_commands:
         w.append("Missing from techsupport file: " + ", ".join(f.missing_commands))
-    w.append(
-        "Object counts (addresses, services, groups, FQDN, EDL) need the config XML from "
-        "the TSF; they are not in the techsupport text."
-    )
+    src = s.config_source or ""
+    if not src:
+        w.append(
+            "Object counts (addresses, services, groups, FQDN, EDL) need the config XML from "
+            "the TSF; they are not in the techsupport text."
+        )
+    elif s.panorama_managed and "merged" not in src:
+        w.append(
+            "Panorama-managed firewall but the merged running config was not used: pushed "
+            "objects and rules may be missing. Use .merged-running-config.xml."
+        )
     return w

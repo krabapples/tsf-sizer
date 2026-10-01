@@ -12,6 +12,7 @@ from .portfolio import catalog
 from .portfolio.importer import AlreadyImportedError, activate, import_workbook
 from .tsf.archive import TsfFormatError, read_tsf
 from .tsf.compare import usage_against_model
+from .tsf.config import ConfigFormatError, count_config
 from .tsf.metrics import summarize
 from .tsf.techsupport import parse_techsupport
 
@@ -143,7 +144,28 @@ def _cmd_analyze(args) -> int:
         print(f"Cannot read TSF: {e}", file=sys.stderr)
         return 1
     facts = parse_techsupport(files.text("techsupport"))
-    s = summarize(facts)
+    config, config_source = None, None
+    if args.config:
+        config_bytes, config_source = Path(args.config).read_bytes(), Path(args.config).name
+    elif "merged_config" in files.files:
+        config_bytes, config_source = (
+            files.files["merged_config"],
+            files.member_names["merged_config"],
+        )
+    elif "running_config" in files.files:
+        config_bytes, config_source = (
+            files.files["running_config"],
+            files.member_names["running_config"],
+        )
+    else:
+        config_bytes = None
+    if config_bytes is not None:
+        try:
+            config = count_config(config_bytes)
+        except ConfigFormatError as e:
+            print(f"Cannot read config XML: {e}", file=sys.stderr)
+            return 1
+    s = summarize(facts, config, config_source)
     ha = s.ha
     print(f"TSF:     {files.source}  (files used: {', '.join(sorted(files.member_names))})")
     print(f"Model:   {s.model}   PAN-OS {s.panos}   uptime {s.uptime_days} days")
@@ -157,6 +179,10 @@ def _cmd_analyze(args) -> int:
         )
     )
     print(f"Sizing basis: {s.sizing_basis.replace('_', ' ')} throughput")
+    print(
+        f"Config:  {s.config_source or 'not provided (object counts missing)'}"
+        + (" (Panorama-managed)" if s.panorama_managed else "")
+    )
     print("\nPorts in use:")
     for p in s.ports:
         print(f"  {p.name:<14} {p.role:<8} {p.speed_class:<20} zone={p.zone or '-'} link={p.state}")
@@ -237,6 +263,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("analyze-tsf", help="Parse a TSF and compare usage with its model")
     s.add_argument("tsf", help="TSF .tgz, or the techsupport_*.txt from it")
     s.add_argument("--model", help="Compare against this model instead of the TSF's own")
+    s.add_argument(
+        "--config",
+        help="Config XML to use (e.g. .merged-running-config.xml) when not inside the TSF",
+    )
     s.add_argument("--json", help="Also write the full result as JSON")
     s.set_defaults(func=_cmd_analyze)
 

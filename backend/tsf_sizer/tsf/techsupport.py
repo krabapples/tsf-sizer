@@ -326,10 +326,14 @@ def parse_licenses(body: str) -> list[dict]:
 _RULE = re.compile(r'^"(.+); index: \d+" \{', re.M)
 
 
+_DEFAULT_RULE = re.compile(r"(^|\+)(intrazone|interzone)-default$")
+
+
 def count_rules(body: str | None) -> int | None:
+    """Count configured rules; the built-in intrazone/interzone defaults don't count."""
     if body is None:
         return None
-    return len(_RULE.findall(body))
+    return sum(1 for name in _RULE.findall(body) if not _DEFAULT_RULE.search(name))
 
 
 def nat_rule_types(body: str | None) -> dict[str, int]:
