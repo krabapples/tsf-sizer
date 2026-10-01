@@ -25,6 +25,7 @@
         <p class="nav-label">Workspace</p>
         <a href="/" {% if request.url.path == '/' or request.url.path.startswith('/analyses') %}aria-current="page"{% endif %}>{{ icon('sparkles') }}<span>Analyses</span></a>
         <a href="/portfolio" {% if request.url.path.startswith('/portfolio') %}aria-current="page"{% endif %}>{{ icon('database') }}<span>Portfolio</span></a>
+        <a href="/settings" {% if request.url.path.startswith('/settings') %}aria-current="page"{% endif %}>{{ icon('cpu') }}<span>AI settings</span></a>
       </nav>
       <div class="sidebar-foot">
         <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch light/dark theme">

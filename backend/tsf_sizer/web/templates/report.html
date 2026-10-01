@@ -49,7 +49,8 @@
 </section>
 
 <nav class="tabs no-print" aria-label="Report sections">
-  <a href="#recommendation" class="active">Recommendation</a>
+  {% if w and w.html %}<a href="#summary">Summary</a>{% endif %}
+  <a href="#recommendation" {% if not (w and w.html) %}class="active"{% endif %}>Recommendation</a>
   {% if v.warnings %}<a href="#checks">Check before quoting <span class="chip chip-warn" style="margin-left:6px;padding:0 7px">{{ v.warnings|length }}</span></a>{% endif %}
   <a href="#usage">Usage</a>
   <a href="#requirements">Requirements</a>
@@ -57,6 +58,24 @@
   {% if v.rejected %}<a href="#rejected">Not qualifying</a>{% endif %}
   <a href="#history">History &amp; licenses</a>
 </nav>
+
+{% set w = v.writeup %}
+{% if w and w.html %}
+<section class="card summary reveal" id="summary" aria-labelledby="sum-h">
+  <div class="card-head">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('sparkles') }}</span><div><h2 id="sum-h">Summary</h2><p class="muted small">Written by {{ w.label }}{% if w.local %} · local{% endif %} · {{ w.seconds }} s · {{ w.generated_at }}. Draft: check before sharing.</p></div></div>
+    <form method="post" action="/analyses/{{ a.id }}/summary" class="no-print"><button class="btn btn-ghost" type="submit" title="Write the summary again with the current AI settings">{{ icon('history') }}<span>Rewrite</span></button></form>
+  </div>
+  {% if w.unverified_numbers or w.unverified_models %}
+  <div class="callout callout-warn" style="margin-bottom:14px">{{ icon('alert') }}<div><strong>Fact check:</strong> the summary mentions {% if w.unverified_models %}model(s) {{ w.unverified_models|join(', ') }}{% endif %}{% if w.unverified_models and w.unverified_numbers %} and {% endif %}{% if w.unverified_numbers %}number(s) {{ w.unverified_numbers|join(', ') }}{% endif %} that are not in the sizing data. Check or rewrite before sharing.</div></div>
+  {% else %}
+  <p class="xs" style="margin:-6px 0 12px"><span class="status status-ok">{{ icon('check', 'icon-sm') }}fact check passed</span> every number and model in the text comes from the sizing data</p>
+  {% endif %}
+  <div class="prose">{{ w.html|safe }}</div>
+</section>
+{% elif w and w.error %}
+<div class="callout callout-warn no-print" role="status">{{ icon('alert') }}<div><strong>No AI summary:</strong> {{ w.error }}<form method="post" action="/analyses/{{ a.id }}/summary" style="display:inline;margin-left:8px"><button class="btn btn-ghost" type="submit">Try again</button></form> <a href="/settings">AI settings</a></div></div>
+{% endif %}
 
 <section id="recommendation" aria-labelledby="rec-h">
   <div class="section-title"><span class="icon-bubble">{{ icon('sparkles') }}</span><h2 id="rec-h">Recommendation</h2></div>

@@ -247,7 +247,14 @@ def build(result: dict, row: dict) -> dict:
     if result.get("portfolio_error"):
         warnings.insert(0, result["portfolio_error"])
 
+    writeup = result.get("writeup")
+    if writeup and writeup.get("text"):
+        from ..llm.writeup import render_markdown
+
+        writeup = dict(writeup, html=render_markdown(writeup["text"]))
+
     return {
+        "writeup": writeup,
         "header": header,
         "kpis": kpis,
         "cards": cards,

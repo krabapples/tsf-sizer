@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Settings · TSF Sizer{% endblock %}
+{% block content %}
+<header class="page-head reveal">
+  <div>
+    <p class="eyebrow">Settings</p>
+    <h1>AI summary (LLM)</h1>
+    <p>Optional: an LLM writes the justification on top of the report. Sizing itself never uses an LLM: it is computed locally in the container.</p>
+  </div>
+  {% if cfg.enabled %}
+  <span class="chip {{ 'chip-good' if local else 'chip-warn' }}">{{ icon('cpu', 'icon-sm') }}{{ cfg.label }}{% if local %} · local{% else %} · leaves this network{% endif %}</span>
+  {% else %}
+  <span class="chip">{{ icon('cpu', 'icon-sm') }}Off</span>
+  {% endif %}
+</header>
+
+{% if msg %}
+<div class="callout {{ 'callout-info' if ok else 'callout-error' }}" role="status">
+  {{ icon('check' if ok else 'x-circle') }}
+  <div><p>{{ msg }}</p>{% if test %}<p class="small muted">Answer: “{{ test.text }}”</p>{% endif %}</div>
+</div>
+{% endif %}
+
+<div class="split">
+  <section class="card stack reveal" aria-labelledby="llm-h">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('cpu') }}</span><h2 id="llm-h">Model</h2></div>
+    <form method="post" action="/settings" class="stack" id="llm-form">
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:6px">Provider</legend>
+        <div class="segmented" style="grid-auto-flow:row;grid-template-columns:repeat(2,1fr)">
+          {% for key, label in providers.items() %}
+          <label><input type="radio" name="provider" value="{{ key }}" {% if cfg.provider == key %}checked{% endif %} data-default-url="{{ default_urls.get(key, '') }}">{{ label }}</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="field">
+        <label for="base_url">Server URL</label>
+        <input id="base_url" name="base_url" type="text" value="{{ cfg.base_url }}" placeholder="{{ default_urls.get(cfg.provider, '') }}" autocomplete="off" spellcheck="false">
+        <p class="hint">Empty = default. Ollama on the same machine as Docker: <code>http://host.docker.internal:11434</code>; the Ollama container from docker-compose: <code>http://ollama:11434</code>. OpenAI-compatible servers: include <code>/v1</code>.</p>
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input id="model" name="model" type="text" value="{{ cfg.model }}" list="model-list" placeholder="e.g. llama3.1:8b, qwen2.5:14b, mistral-nemo" autocomplete="off" spellcheck="false">
+        {% if models %}
+        <datalist id="model-list">{% for m in models %}<option value="{{ m }}">{% endfor %}</datalist>
+        <div class="tags" style="margin-top:6px">{% for m in models %}<button type="button" class="chip chip-primary" style="border:0;cursor:pointer" onclick="document.getElementById('model').value=this.textContent">{{ m }}</button>{% endfor %}</div>
+        {% endif %}
+        <p class="hint">Bigger instruction-tuned models (8B+) write noticeably better justifications than small ones.</p>
+      </div>
+      <details class="disclosure">
+        <summary><span>Advanced</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+        <div class="body grid-3">
+          <div class="field"><label for="temperature">Temperature</label><input id="temperature" name="temperature" type="number" min="0" max="2" step="0.1" value="{{ cfg.temperature }}"></div>
+          <div class="field"><label for="max_tokens">Max tokens</label><input id="max_tokens" name="max_tokens" type="number" min="100" max="8000" step="50" value="{{ cfg.max_tokens }}"></div>
+          <div class="field"><label for="timeout">Timeout (s)</label><input id="timeout" name="timeout" type="number" min="5" max="1800" step="5" value="{{ cfg.timeout|int }}"></div>
+        </div>
+      </details>
+      <p class="small muted">API key: {% if api_key_set %}<span class="status status-ok">set</span> via <code>TSF_SIZER_LLM_API_KEY</code>{% else %}not set. Only needed for Anthropic or OpenAI-compatible servers that require one; set <code>TSF_SIZER_LLM_API_KEY</code> on the container. Keys are never stored in the app.{% endif %}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" type="submit" name="action" value="save">{{ icon('check') }}<span>Save</span></button>
+        <button class="btn" type="submit" name="action" value="models">{{ icon('list') }}<span>Find models</span></button>
+        <button class="btn" type="submit" name="action" value="test">{{ icon('activity') }}<span>Save &amp; test</span></button>
+        <button class="btn btn-ghost" type="submit" name="action" value="reset" formnovalidate>Reset to container defaults ({{ env_provider }})</button>
+      </div>
+    </form>
+  </section>
+
+  <aside class="stack reveal">
+    <section class="card stack">
+      <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('shield') }}</span><h2>What the LLM receives</h2></div>
+      <ul class="reasons small">
+        <li>Only the computed figures: models, counts, capacities, assumptions and warnings.</li>
+        <li>Never the TSF, hostnames, IP addresses, serial numbers, usernames or object/rule names.</li>
+        <li>Every number and model name in the answer is checked against these facts; anything else is flagged in the report.</li>
+        <li>With <strong>Ollama</strong> or another local server, nothing leaves your network.</li>
+      </ul>
+      {% if preview %}
+      <details class="more"><summary>{{ icon('chevron-down', 'icon-sm') }}Exact data sent for the latest analysis</summary><pre class="code-block">{{ preview }}</pre></details>
+      {% endif %}
+      <details class="more"><summary>{{ icon('chevron-down', 'icon-sm') }}Instructions given to the model</summary><pre class="code-block">{{ system_prompt }}</pre></details>
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  // Show the provider's default URL as placeholder when switching providers.
+  document.querySelectorAll('input[name="provider"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      document.getElementById('base_url').placeholder = r.dataset.defaultUrl || '';
+    });
+  });
+</script>
+{% endblock %}

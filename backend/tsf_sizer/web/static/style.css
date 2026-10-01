@@ -415,6 +415,14 @@ section[id] { scroll-margin-top: 80px; }
 details.more > summary { cursor: pointer; font-weight: 650; color: var(--primary); padding: 10px 2px; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
 details.more > summary::-webkit-details-marker { display: none; }
 
+/* ------------------------------------------------------------------ AI summary & settings */
+.summary { border-left: 4px solid var(--primary); }
+.prose { display: grid; gap: 10px; max-width: 78ch; color: var(--ink-2); }
+.prose h3 { font-size: .95rem; margin-top: 6px; color: var(--ink); }
+.prose ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.prose p { line-height: 1.65; }
+.code-block { margin: 8px 0 0; padding: 12px; max-height: 340px; overflow: auto; border-radius: 10px; background: var(--surface-3); border: 1px solid var(--border); font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; }
+
 /* ------------------------------------------------------------------ status page */
 .progress { display: grid; gap: 22px; padding: 30px; }
 .stepper { display: grid; gap: 14px; }

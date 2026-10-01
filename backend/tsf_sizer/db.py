@@ -124,6 +124,14 @@ CREATE TABLE IF NOT EXISTS family_setting (
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Small key/value store for settings changed in the web UI (LLM provider, model, ...).
+-- Secrets (API keys) are never stored here; they come from environment variables.
+CREATE TABLE IF NOT EXISTS app_setting (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Defaults from the presales team (2026-10): the PA-500 series is released and
 -- succeeds the PA-400. Inserted once; edits on the Portfolio page are kept.
 INSERT OR IGNORE INTO family_setting (family, quotable, superseded_by, notes) VALUES

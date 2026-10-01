@@ -28,7 +28,17 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import db
-from ..pipeline import run_job
+from ..llm import settings as llm_settings
+from ..llm.providers import (
+    DEFAULT_BASE_URL,
+    LOCAL_PROVIDERS,
+    PROVIDERS,
+    LLMError,
+    chat,
+    list_models,
+)
+from ..llm.writeup import SYSTEM_PROMPT, build_facts
+from ..pipeline import regenerate_writeup, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
 from ..sizing.engine import SizingParams
@@ -59,6 +69,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         conn.execute(
             "UPDATE analysis SET status='error', error='Interrupted by a restart' "
             "WHERE status IN ('queued', 'running')"
+        )
+        # A summary that was being written: the sizing result itself is complete.
+        conn.execute(
+            "UPDATE analysis SET status='done' WHERE status='writing' AND result_json IS NOT NULL"
         )
 
     app = FastAPI(title="TSF Sizer", docs_url=None, redoc_url=None)
@@ -141,10 +155,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             history.append(item)
         with conn() as c:
             superseded = catalog.superseded_families(c)
+            llm = llm_settings.load(c)
         return render(
             request,
             "index.html",
             superseded=superseded,
+            llm=llm,
             portfolio=doc,
             history=history,
             defaults=SizingParams(),
@@ -163,6 +179,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         peak_cps: str = Form(""),
         peak_sessions: str = Form(""),
         port_rule: str = Form("all"),
+        ai_summary: str = Form(""),
         include_superseded: str = Form(""),
         need_poe: str = Form(""),
         max_size_factor: float = Form(5.0),
@@ -217,6 +234,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             params,
             filename,
             config_name,
+            bool(ai_summary),
         )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
@@ -252,6 +270,115 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "Content-Disposition": f'attachment; filename="tsf-sizing-{analysis_id}.json"'
             },
         )
+
+    @app.post("/analyses/{analysis_id}/summary")
+    def rewrite_summary(analysis_id: int):
+        row = load(analysis_id)
+        if row["status"] != "done":
+            raise HTTPException(409, "The analysis is not finished")
+        with conn() as c:
+            if not llm_settings.load(c).enabled:
+                raise HTTPException(400, "No LLM configured: set one up on the Settings page")
+            c.execute("UPDATE analysis SET status='writing' WHERE id=?", (analysis_id,))
+        app.state.executor.submit(regenerate_writeup, settings.db_path, analysis_id)
+        return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
+
+    # ------------------------------------------------------------------ LLM settings
+
+    def settings_page(
+        request: Request,
+        msg: str | None = None,
+        ok: bool = True,
+        models: list[str] | None = None,
+        test: dict | None = None,
+    ):
+        with conn() as c:
+            cfg = llm_settings.load(c)
+            last = c.execute(
+                "SELECT result_json FROM analysis WHERE status='done' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        preview = None
+        if last and last[0]:
+            preview = json.dumps(build_facts(json.loads(last[0])), indent=1, ensure_ascii=False)
+        return render(
+            request,
+            "settings.html",
+            cfg=cfg,
+            providers=PROVIDERS,
+            default_urls=DEFAULT_BASE_URL,
+            local=cfg.provider in LOCAL_PROVIDERS,
+            env_provider=os.environ.get("TSF_SIZER_LLM_PROVIDER", "none"),
+            api_key_set=bool(cfg.api_key),
+            msg=msg,
+            ok=ok,
+            models=models,
+            test=test,
+            preview=preview,
+            system_prompt=SYSTEM_PROMPT,
+        )
+
+    @app.get("/settings", response_class=HTMLResponse)
+    def show_settings(request: Request, msg: str | None = None):
+        return settings_page(request, msg)
+
+    @app.post("/settings", response_class=HTMLResponse)
+    def save_settings(
+        request: Request,
+        provider: str = Form("none"),
+        base_url: str = Form(""),
+        model: str = Form(""),
+        temperature: float = Form(0.2),
+        max_tokens: int = Form(900),
+        timeout: float = Form(180),
+        action: str = Form("save"),
+    ):
+        if provider not in PROVIDERS:
+            raise HTTPException(400, "Unknown provider")
+        if not (0 <= temperature <= 2 and 100 <= max_tokens <= 8000 and 5 <= timeout <= 1800):
+            raise HTTPException(400, "Temperature 0-2, max tokens 100-8000, timeout 5-1800 s")
+        base_url = base_url.strip()
+        if base_url and not base_url.startswith(("http://", "https://")):
+            raise HTTPException(400, "The server URL must start with http:// or https://")
+        with conn() as c:
+            if action == "reset":
+                llm_settings.reset(c)
+                return settings_page(request, "Back to the container's environment settings.")
+            llm_settings.save(
+                c,
+                provider=provider,
+                base_url=base_url,
+                model=model.strip(),
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+            )
+            cfg = llm_settings.load(c)
+        if action == "models":
+            try:
+                found = list_models(cfg)
+            except LLMError as e:
+                return settings_page(request, f"Could not list models: {e}", ok=False)
+            if not found:
+                return settings_page(
+                    request,
+                    "Connected, but the server has no models. For Ollama: ollama pull <model>.",
+                    ok=False,
+                    models=[],
+                )
+            return settings_page(request, f"Found {len(found)} model(s).", models=found)
+        if action == "test":
+            if not cfg.enabled:
+                return settings_page(request, "Choose a provider and model first.", ok=False)
+            try:
+                reply = chat(cfg, "You are a connectivity test.", "Reply with the single word OK.")
+            except LLMError as e:
+                return settings_page(request, f"Test failed: {e}", ok=False)
+            return settings_page(
+                request,
+                f"{cfg.label} answered in {reply.seconds} s.",
+                test={"text": reply.text[:200]},
+            )
+        return settings_page(request, "Settings saved.")
 
     @app.post("/analyses/{analysis_id}/delete")
     def delete_analysis(analysis_id: int):

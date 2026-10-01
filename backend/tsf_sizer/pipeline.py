@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from . import db
+from .llm import settings as llm_settings
+from .llm.writeup import write as write_summary
 from .portfolio import catalog
 from .sizing.engine import SizingParams, size
 from .tsf.archive import read_tsf
@@ -84,6 +86,7 @@ def run_job(
     params: SizingParams,
     source_name: str,
     config_name: str | None = None,
+    ai_summary: bool = True,
 ) -> None:
     """Background job: never raises; records the outcome on the analysis row.
 
@@ -94,6 +97,8 @@ def run_job(
         with conn:
             conn.execute("UPDATE analysis SET status='running' WHERE id=?", (analysis_id,))
         result = analyze(conn, tsf_path, params, config_path, source_name, config_name)
+        if ai_summary:
+            _add_writeup(conn, analysis_id, result)
         with conn:
             conn.execute(
                 "UPDATE analysis SET status='done', result_json=?, finished_at=datetime('now') "
@@ -117,3 +122,36 @@ def run_job(
         for p in (tsf_path, config_path):
             if p is not None:
                 p.unlink(missing_ok=True)
+
+
+def _add_writeup(conn: sqlite3.Connection, analysis_id: int, result: dict) -> None:
+    """Ask the configured LLM for the written justification (if one is configured).
+
+    Failures end up in result['writeup']['error']; the analysis itself never fails on it.
+    """
+    cfg = llm_settings.load(conn)
+    if not cfg.enabled:
+        return
+    with conn:
+        conn.execute("UPDATE analysis SET status='writing' WHERE id=?", (analysis_id,))
+    result["writeup"] = write_summary(cfg, result)
+
+
+def regenerate_writeup(db_path: str, analysis_id: int) -> None:
+    """Background job: (re)write the summary of a finished analysis with the current LLM."""
+    conn = db.connect(db_path)
+    try:
+        row = conn.execute("SELECT result_json FROM analysis WHERE id=?", (analysis_id,)).fetchone()
+        if row is None or not row[0]:
+            return
+        result = json.loads(row[0])
+        try:
+            _add_writeup(conn, analysis_id, result)
+        finally:
+            with conn:
+                conn.execute(
+                    "UPDATE analysis SET status='done', result_json=? WHERE id=?",
+                    (json.dumps(result, default=str), analysis_id),
+                )
+    finally:
+        conn.close()

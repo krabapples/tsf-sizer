@@ -78,6 +78,16 @@
       </label>
       {% endif %}
 
+      {% if llm.enabled %}
+      <label class="switch-row" for="ai_summary">
+        <span class="text">
+          <strong>Write an AI summary</strong>
+          <span class="hint">{{ llm.label }}{% if llm.provider == 'ollama' %} (local){% endif %}. Only computed figures are sent, never the TSF. <a href="/settings">Settings</a></span>
+        </span>
+        <span class="switch"><input id="ai_summary" name="ai_summary" type="checkbox" value="1" role="switch" checked><span class="track"></span></span>
+      </label>
+      {% endif %}
+
       <label class="switch-row" for="need_poe">
         <span class="text">
           <strong>Customer needs PoE</strong>
