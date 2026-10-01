@@ -18,6 +18,7 @@ import os
 import secrets
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -85,8 +86,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             return await call_next(request)
 
+    @contextmanager
     def conn():
-        return db.connect(settings.db_path)
+        """Connection for one request: commit on success, always close."""
+        c = db.connect(settings.db_path)
+        try:
+            with c:
+                yield c
+        finally:
+            c.close()
 
     def render(request: Request, name: str, **ctx):
         return templates.TemplateResponse(request, name, ctx)
@@ -268,6 +276,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request,
             "portfolio.html",
             families=families,
+            active_ids={d["id"] for d in docs if d["is_active"]},
             docs=docs,
             models=models,
             report=report,

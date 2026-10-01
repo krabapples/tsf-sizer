@@ -29,7 +29,7 @@ build-backend = "setuptools.build_meta"
 include = ["tsf_sizer*"]
 
 [tool.setuptools.package-data]
-"tsf_sizer.web" = ["templates/*.html", "static/*"]
+"tsf_sizer.web" = ["templates/*.html", "static/*", "static/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

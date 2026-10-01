@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Error · TSF Sizer{% endblock %}
 {% block content %}
-<h1>{{ 'Not found' if status == 404 else 'Something went wrong' }}</h1>
+<header class="page-head"><div><p class="eyebrow">Error {{ status }}</p><h1>{{ 'Not found' if status == 404 else 'Something went wrong' }}</h1></div></header>
 <div class="callout callout-error" role="alert">
-  <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+  {{ icon('x-circle') }}
   <div><p>{{ detail }}</p><p><a href="/">Back to analyses</a></p></div>
 </div>
 {% endblock %}

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -100,12 +101,17 @@ def run_job(
                 (json.dumps(result, default=str), analysis_id),
             )
     except Exception as e:  # noqa: BLE001 - any failure must reach the user, not kill the worker
-        with conn:
-            conn.execute(
-                "UPDATE analysis SET status='error', error=?, finished_at=datetime('now') "
-                "WHERE id=?",
-                (f"{type(e).__name__}: {e}", analysis_id),
-            )
+        for attempt in range(3):  # the error must be recorded, or the page waits forever
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE analysis SET status='error', error=?, "
+                        "finished_at=datetime('now') WHERE id=?",
+                        (f"{type(e).__name__}: {e}", analysis_id),
+                    )
+                break
+            except sqlite3.OperationalError:
+                time.sleep(1 + attempt)
     finally:
         conn.close()
         for p in (tsf_path, config_path):

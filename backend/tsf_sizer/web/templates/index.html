@@ -1,136 +1,146 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Analyses · TSF Sizer{% endblock %}
 {% block content %}
-<h1>Size a replacement firewall</h1>
+<header class="page-head reveal">
+  <div>
+    <p class="eyebrow">New analysis</p>
+    <h1>Size a replacement firewall</h1>
+    <p>Drop a Tech Support File: the tool reads usage, config and ports, and picks the right model from the current portfolio.</p>
+  </div>
+  {% if portfolio %}
+  <a class="chip chip-good" href="/portfolio" title="Active capacity workbook">{{ icon('database', 'icon-sm') }} {{ portfolio.filename }} · PAN-OS {{ portfolio.panos_release }}</a>
+  {% endif %}
+</header>
 
 {% if not portfolio %}
-<div class="callout callout-warn" role="alert">
-  <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
-  <div><strong>No portfolio loaded.</strong> Import the Features &amp; Capacities workbook on the <a href="/portfolio">Portfolio page</a> first; without it the report can't recommend a model.</div>
+<div class="callout callout-warn reveal" role="alert">
+  {{ icon('alert') }}
+  <div><strong>No portfolio loaded.</strong> <p>Import the Features &amp; Capacities workbook on the <a href="/portfolio">Portfolio page</a> first; without it the report can't recommend a model.</p></div>
 </div>
-{% else %}
-<p class="muted">Portfolio: {{ portfolio.filename }} · PAN-OS {{ portfolio.panos_release }} · imported {{ portfolio.imported_at }}</p>
 {% endif %}
 
-<section class="card" aria-labelledby="upload-h">
-  <h2 id="upload-h">New analysis</h2>
-  <form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form">
-    <div class="grid-2">
-      <div class="field">
-        <label for="tsf">Tech Support File <span class="req">required</span></label>
-        <input id="tsf" name="tsf" type="file" required accept=".tgz,.gz,.tar,.txt">
-        <p class="hint">The TSF as exported from the firewall (.tgz, up to {{ max_mb }} MB), or the <code>techsupport_*.txt</code> from inside it. Only a few files are read; the upload is deleted after processing.</p>
-      </div>
-      <div class="field">
-        <label for="config">Config XML <span class="opt">optional</span></label>
-        <input id="config" name="config" type="file" accept=".xml">
-        <p class="hint">Only needed when you upload the .txt alone. Use <code>.merged-running-config.xml</code> for Panorama-managed firewalls.</p>
-      </div>
-      <div class="field">
-        <label for="customer">Customer / opportunity <span class="opt">optional</span></label>
-        <input id="customer" name="customer" type="text" maxlength="200" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="port_rule">Port rule</label>
-        <select id="port_rule" name="port_rule">
-          <option value="all" selected>At least the current model's full port layout</option>
-          <option value="used">Only the ports in use</option>
-        </select>
-      </div>
-      {% if superseded %}
-      <div class="field">
-        <span class="label">Model generations</span>
-        <label class="check switch" for="include_superseded">
-          <input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch">
-          <span>Include previous-generation models
-            <span class="hint-inline">({% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %})</span>
-          </span>
-        </label>
-        <p class="hint">Off: only the current generation is recommended. Turn on when the customer still wants the older series.</p>
-      </div>
-      {% endif %}
+<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="split">
+  <section class="card hero-upload reveal" aria-labelledby="upload-h">
+    <div class="steps" aria-hidden="true"><span><b>1</b> Upload TSF</span><span><b>2</b> Tune assumptions</span><span><b>3</b> Get the report</span></div>
+    <h2 id="upload-h" class="sr-only">Upload</h2>
+
+    <label class="dropzone" for="tsf">
+      <span class="icon-bubble">{{ icon('upload', 'icon-lg') }}</span>
+      <strong data-title>Drop the Tech Support File here, or <span class="browse">browse</span></strong>
+      <span class="hint" data-sub>The .tgz exported from the firewall (up to {{ max_mb }} MB), or the <code>techsupport_*.txt</code> from inside it</span>
+      <input id="tsf" name="tsf" type="file" required accept=".tgz,.gz,.tar,.txt" aria-describedby="tsf-help">
+    </label>
+    <p id="tsf-help" class="hint">Only the CLI output and config are read; logs are skipped and the upload is deleted as soon as the report is ready.</p>
+
+    <label class="dropzone dropzone-sm" for="config">
+      <span class="icon-bubble">{{ icon('code') }}</span>
+      <span>
+        <strong data-title>Config XML <span class="opt">optional</span></strong>
+        <span class="hint" data-sub>Only when you upload the .txt alone. Use <code>.merged-running-config.xml</code> for Panorama-managed firewalls.</span>
+      </span>
+      <input id="config" name="config" type="file" accept=".xml">
+    </label>
+
+    <div class="field">
+      <label for="customer">Customer / opportunity <span class="opt">optional</span></label>
+      <input id="customer" name="customer" type="text" maxlength="200" autocomplete="off" placeholder="e.g. ACME – branch refresh">
     </div>
 
-    <details class="advanced">
-      <summary>Sizing assumptions and known peaks</summary>
-      <div class="grid-3">
-        <div class="field">
-          <label for="growth_pct">Growth per year (%)</label>
-          <input id="growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}">
-        </div>
-        <div class="field">
-          <label for="years">Planning horizon (years)</label>
-          <input id="years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}">
-        </div>
-        <div class="field">
-          <label for="target_util_pct">Target utilization (%)</label>
-          <input id="target_util_pct" name="target_util_pct" type="number" min="10" max="100" step="5" value="{{ defaults.target_util_pct|int }}">
-          <p class="hint">Performance is sized so the peak stays below this.</p>
-        </div>
-        <div class="field">
-          <label for="max_size_factor">Maximum size (× current performance)</label>
-          <input id="max_size_factor" name="max_size_factor" type="number" min="0" max="100" step="0.5" value="{{ defaults.max_size_factor|num }}">
-          <p class="hint">Models with more throughput than this are "too large" and not recommended. 0 = no limit.</p>
-        </div>
-        <div class="field">
-          <label for="peak_throughput_mbps">Known peak throughput (Mbps)</label>
-          <input id="peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring">
-          <p class="hint">The TSF only has a snapshot; a known peak gives a far better result.</p>
-        </div>
-        <div class="field">
-          <label for="peak_cps">Known peak connections/s</label>
-          <input id="peak_cps" name="peak_cps" type="text" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label for="peak_sessions">Known peak sessions</label>
-          <input id="peak_sessions" name="peak_sessions" type="text" inputmode="numeric">
-        </div>
-      </div>
-    </details>
-
-    <div class="actions">
-      <button type="submit" class="btn btn-primary" id="submit-btn">
-        <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
-        <span>Upload and analyze</span>
+    <div>
+      <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+        {{ icon('sparkles') }}<span>Upload and analyze</span>
       </button>
-      <span class="muted" id="upload-status" aria-live="polite"></span>
+      <span class="muted small" id="upload-status" aria-live="polite" style="margin-left:10px"></span>
     </div>
-  </form>
-</section>
+  </section>
 
-<section aria-labelledby="hist-h">
-  <h2 id="hist-h">Recent analyses</h2>
+  <aside class="stack reveal" aria-label="Sizing options">
+    <section class="card stack">
+      <div class="section-title"><span class="icon-bubble">{{ icon('sliders') }}</span><h2>Options</h2></div>
+
+      <fieldset class="field" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:6px">Port rule</legend>
+        <div class="segmented">
+          <label><input type="radio" name="port_rule" value="all" checked>Full port layout</label>
+          <label><input type="radio" name="port_rule" value="used">Ports in use</label>
+        </div>
+        <p class="hint">Full layout: the new model offers at least every port type of the current one.</p>
+      </fieldset>
+
+      {% if superseded %}
+      <label class="switch-row" for="include_superseded">
+        <span class="text">
+          <strong>Include previous-generation models</strong>
+          <span class="hint">{% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %}. Off: only the current generation is recommended.</span>
+        </span>
+        <span class="switch"><input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch"><span class="track"></span></span>
+      </label>
+      {% endif %}
+
+      <details class="disclosure">
+        <summary><span>Sizing assumptions and known peaks</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+        <div class="body grid-2" style="gap:14px">
+          <div class="field">
+            <label for="growth_pct">Growth per year</label>
+            <div class="input-suffix"><input id="growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}"><span>%</span></div>
+          </div>
+          <div class="field">
+            <label for="years">Planning horizon</label>
+            <div class="input-suffix"><input id="years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}"><span>years</span></div>
+          </div>
+          <div class="field">
+            <label for="target_util_pct">Target utilization</label>
+            <div class="input-suffix"><input id="target_util_pct" name="target_util_pct" type="number" min="10" max="100" step="5" value="{{ defaults.target_util_pct|int }}"><span>%</span></div>
+          </div>
+          <div class="field">
+            <label for="max_size_factor">Maximum size</label>
+            <div class="input-suffix"><input id="max_size_factor" name="max_size_factor" type="number" min="0" max="100" step="0.5" value="{{ defaults.max_size_factor|num }}"><span>× perf</span></div>
+          </div>
+          <p class="hint" style="grid-column:1/-1">Models above the maximum size (× the current throughput) are "too large". 0 = no limit.</p>
+          <div class="field">
+            <label for="peak_throughput_mbps">Known peak throughput</label>
+            <div class="input-suffix"><input id="peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring"><span>Mbps</span></div>
+          </div>
+          <div class="field">
+            <label for="peak_cps">Known peak connections</label>
+            <div class="input-suffix"><input id="peak_cps" name="peak_cps" type="text" inputmode="numeric"><span>/s</span></div>
+          </div>
+          <div class="field">
+            <label for="peak_sessions">Known peak sessions</label>
+            <input id="peak_sessions" name="peak_sessions" type="text" inputmode="numeric">
+          </div>
+          <p class="hint" style="grid-column:1/-1">The TSF only has a throughput snapshot; a known peak gives a far better result.</p>
+        </div>
+      </details>
+    </section>
+  </aside>
+</form>
+
+<section class="card reveal" aria-labelledby="hist-h" id="history">
+  <div class="card-head">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('history') }}</span><div><h2 id="hist-h">Recent analyses</h2><p class="muted small">Newest first</p></div></div>
+  </div>
   {% if history %}
-  <div class="table-wrap">
-  <table class="table">
-    <thead><tr><th scope="col">#</th><th scope="col">Date (UTC)</th><th scope="col">Customer</th><th scope="col">File</th><th scope="col">Current</th><th scope="col">Recommended</th><th scope="col">Status</th></tr></thead>
-    <tbody>
+  <div class="runs">
     {% for h in history %}
-      <tr>
-        <td><a href="/analyses/{{ h.id }}">{{ h.id }}</a></td>
-        <td class="nowrap">{{ h.created_at }}</td>
-        <td>{{ h.customer or '–' }}</td>
-        <td class="truncate" title="{{ h.filename }}">{{ h.filename }}</td>
-        <td>{{ h.model or '–' }}</td>
-        <td>{% if h.recommended %}<strong>{{ h.recommended }}</strong>{% else %}–{% endif %}</td>
-        <td><span class="badge badge-{{ h.status }}">{{ h.status }}</span></td>
-      </tr>
+    <a class="run" href="/analyses/{{ h.id }}">
+      <span class="run-id">#{{ h.id }}</span>
+      <span class="run-main">
+        <strong>{{ h.customer or h.filename }}</strong>
+        <span>{% if h.customer %}{{ h.filename }} · {% endif %}{{ h.created_at }} UTC</span>
+      </span>
+      {% if h.model %}
+      <span class="path">{{ h.model }} {{ icon('arrow-right', 'icon-sm') }} <span class="to">{{ h.recommended or '–' }}</span></span>
+      {% else %}<span></span>{% endif %}
+      {% if h.status == 'done' %}<span class="chip chip-good"><span class="dot"></span>done</span>
+      {% elif h.status == 'error' %}<span class="chip chip-crit"><span class="dot"></span>error</span>
+      {% else %}<span class="chip chip-warn"><span class="dot"></span>{{ h.status }}</span>{% endif %}
+    </a>
     {% endfor %}
-    </tbody>
-  </table>
   </div>
   {% else %}
-  <p class="muted">No analyses yet.</p>
+  <div class="empty">{{ icon('layers', 'icon-lg') }}<p>No analyses yet. Upload a TSF to get the first report.</p></div>
   {% endif %}
 </section>
-{% endblock %}
-{% block scripts %}
-<script>
-  document.getElementById('upload-form').addEventListener('submit', function () {
-    var b = document.getElementById('submit-btn');
-    b.disabled = true;
-    b.querySelector('span').textContent = 'Uploading…';
-    document.getElementById('upload-status').textContent = 'Large TSFs can take a minute to upload.';
-  });
-</script>
 {% endblock %}

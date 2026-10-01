@@ -1,83 +1,105 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Portfolio · TSF Sizer{% endblock %}
 {% block content %}
-<h1>Portfolio</h1>
-{% if msg %}<div class="callout {{ 'callout-error' if 'failed' in msg else 'callout-info' }}" role="status"><div>{{ msg }}</div></div>{% endif %}
+<header class="page-head reveal">
+  <div>
+    <p class="eyebrow">Portfolio</p>
+    <h1>Capacity data &amp; model families</h1>
+    <p>The Features &amp; Capacities workbook the recommendations are based on, plus your team's settings on top.</p>
+  </div>
+</header>
 
-<section class="card" aria-labelledby="imp-h">
-  <h2 id="imp-h">Import a Features &amp; Capacities workbook</h2>
-  <form method="post" action="/portfolio" enctype="multipart/form-data">
-    <div class="field">
-      <label for="workbook">Workbook (.xlsx)</label>
-      <input id="workbook" name="workbook" type="file" accept=".xlsx" required>
-      <p class="hint">A new import is not used until you activate it. The file itself is not kept.</p>
+{% if msg %}
+<div class="callout {{ 'callout-error' if 'failed' in msg else 'callout-info' }}" role="status">
+  {{ icon('x-circle' if 'failed' in msg else 'info') }}<div>{{ msg }}</div>
+</div>
+{% endif %}
+
+<div class="split">
+  <section class="card stack reveal" aria-labelledby="imp-h">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('upload') }}</span><div><h2 id="imp-h">Import a workbook</h2><p class="muted small">A new import is only used after you activate it. The file itself is not kept.</p></div></div>
+    <form method="post" action="/portfolio" enctype="multipart/form-data" class="stack">
+      <label class="dropzone" for="workbook">
+        <span class="icon-bubble">{{ icon('database', 'icon-lg') }}</span>
+        <strong data-title>Drop the Features &amp; Capacities workbook, or <span class="browse">browse</span></strong>
+        <span class="hint" data-sub>.xlsx as published by PLM</span>
+        <input id="workbook" name="workbook" type="file" accept=".xlsx" required>
+      </label>
+      <label class="switch-row" for="force">
+        <span class="text"><strong>Re-import</strong><span class="hint">Replace an earlier import of this same file</span></span>
+        <span class="switch"><input id="force" type="checkbox" name="force" value="1" role="switch"><span class="track"></span></span>
+      </label>
+      <div><button type="submit" class="btn btn-primary">{{ icon('upload') }}<span>Import</span></button></div>
+    </form>
+  </section>
+
+  <section class="card reveal" aria-labelledby="docs-h">
+    <div class="section-title"><span class="icon-bubble">{{ icon('history') }}</span><h2 id="docs-h">Imported versions</h2></div>
+    {% if docs %}
+    <div class="runs">
+      {% for d in docs|reverse %}
+      <div class="run" style="grid-template-columns:auto minmax(0,1fr) auto">
+        <span class="run-id">#{{ d.id }}</span>
+        <a class="run-main" href="/portfolio?imported={{ d.id }}" style="color:inherit">
+          <strong>{{ d.filename }}</strong><span>PAN-OS {{ d.panos_release }} · {{ d.imported_at }} UTC</span>
+        </a>
+        {% if d.is_active %}<span class="chip chip-good"><span class="dot"></span>active</span>
+        {% else %}<form method="post" action="/portfolio/{{ d.id }}/activate"><button class="btn btn-ghost" type="submit">Activate</button></form>{% endif %}
+      </div>
+      {% endfor %}
     </div>
-    <label class="check"><input type="checkbox" name="force" value="1"> Re-import if this file was imported before</label>
-    <div class="actions"><button type="submit" class="btn btn-primary">Import</button></div>
-  </form>
-</section>
+    {% else %}
+    <div class="empty">{{ icon('database', 'icon-lg') }}<p>Nothing imported yet.</p></div>
+    {% endif %}
+  </section>
+</div>
 
 {% if report %}
-<section class="card" aria-labelledby="rep-h">
-  <h2 id="rep-h">Import report, document {{ report.document_id }}</h2>
-  <dl class="facts">
-    <div><dt>Sheet</dt><dd>{{ report.sheet_name }} (PAN-OS {{ report.panos_release }})</dd></div>
-    <div><dt>Attributes</dt><dd>{{ report.attribute_count }}</dd></div>
-    <div><dt>Cells</dt><dd>{{ report.cell_count|num }}</dd></div>
-    <div><dt>Unconfirmed cells</dt><dd>{{ report.unconfirmed_count }}</dd></div>
-    <div><dt>Needs review</dt><dd>{{ report.needs_review_total }}</dd></div>
-    <div><dt>TSF mappings</dt><dd>{{ report.tsf_map_resolved }} resolved, {{ report.tsf_map_unresolved|length }} unresolved</dd></div>
-  </dl>
-  {% for group, names in report.models.items() %}<p class="small"><strong>{{ group }}:</strong> {{ names|join(', ') or '–' }}</p>{% endfor %}
+<section class="card stack reveal" aria-labelledby="rep-h">
+  <div class="card-head" style="margin:0">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('file-check') }}</span><div><h2 id="rep-h">Import report, document {{ report.document_id }}</h2><p class="muted small">{{ report.filename }} · sheet {{ report.sheet_name }}</p></div></div>
+    {% if report.document_id not in active_ids %}
+    <form method="post" action="/portfolio/{{ report.document_id }}/activate"><button class="btn btn-primary" type="submit">{{ icon('check') }}<span>Activate this version</span></button></form>
+    {% endif %}
+  </div>
+  <div class="stat-row">
+    <div class="stat"><span>PAN-OS release</span><strong>{{ report.panos_release }}</strong></div>
+    <div class="stat"><span>Attributes</span><strong>{{ report.attribute_count }}</strong></div>
+    <div class="stat"><span>Cells read</span><strong>{{ report.cell_count|num }}</strong></div>
+    <div class="stat"><span>Unconfirmed cells</span><strong>{{ report.unconfirmed_count }}</strong></div>
+    <div class="stat"><span>Need a decision</span><strong>{{ report.needs_review_total }}</strong></div>
+    <div class="stat"><span>TSF mappings</span><strong>{{ report.tsf_map_resolved }}/{{ report.tsf_map_resolved + report.tsf_map_unresolved|length }}</strong></div>
+  </div>
+  <p class="xs muted">As marked in the workbook (family settings below can override this):</p>
+  {% for group, names in report.models.items() %}<p class="small"><strong>{{ group }}:</strong> <span class="muted">{{ names|join(', ') or '–' }}</span></p>{% endfor %}
   {% if report.diff %}<p class="small"><strong>Changes vs document {{ report.diff.previous_document_id }}:</strong> {{ report.diff.changed_total }} changed, {{ report.diff.added_total }} added, {{ report.diff.removed_total }} removed.</p>{% endif %}
   {% if report.needs_review %}
-  <details class="more"><summary>{{ report.needs_review_total }} cells need a decision</summary>
+  <details class="more"><summary>{{ icon('chevron-down', 'icon-sm') }}{{ report.needs_review_total }} cells need a decision</summary>
     <div class="table-wrap"><table class="table">
       <thead><tr><th scope="col">Reason</th><th scope="col">Model</th><th scope="col">Attribute</th><th scope="col">Value</th></tr></thead>
       <tbody>{% for i in report.needs_review %}<tr><td>{{ i.reason }}</td><td>{{ i.model }}</td><td>{{ i.attribute }}</td><td><code>{{ i.raw }}</code></td></tr>{% endfor %}</tbody>
     </table></div>
   </details>
   {% endif %}
-  {% if not report.activated %}
-  <form method="post" action="/portfolio/{{ report.document_id }}/activate"><button class="btn btn-primary" type="submit">Activate this version</button></form>
-  {% endif %}
 </section>
 {% endif %}
 
-<section aria-labelledby="docs-h">
-  <h2 id="docs-h">Imported versions</h2>
-  {% if docs %}
-  <div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">#</th><th scope="col">File</th><th scope="col">Release</th><th scope="col">Imported (UTC)</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
-    <tbody>
-    {% for d in docs %}
-      <tr>
-        <td><a href="/portfolio?imported={{ d.id }}">{{ d.id }}</a></td><td>{{ d.filename }}</td><td>{{ d.panos_release }}</td><td>{{ d.imported_at }}</td>
-        <td>{% if d.is_active %}<span class="badge badge-done">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
-        <td>{% if not d.is_active %}<form method="post" action="/portfolio/{{ d.id }}/activate"><button class="btn btn-quiet" type="submit">Activate</button></form>{% endif %}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  {% else %}<p class="muted">Nothing imported yet.</p>{% endif %}
-</section>
-
 {% if families %}
-<section aria-labelledby="fam-h" id="families">
-  <h2 id="fam-h">Model families</h2>
-  <p class="small muted">Team settings that override the workbook. <strong>Quotable</strong> releases a family the sheet marks as NPI (or blocks one). <strong>Succeeded by</strong> marks a previous generation: it is left out of recommendations unless "Include previous-generation models" is ticked on the analysis form. Settings are kept when a new workbook is imported.</p>
+<section class="card reveal" aria-labelledby="fam-h" id="families">
+  <div class="section-title"><span class="icon-bubble">{{ icon('layers') }}</span><div><h2 id="fam-h">Model families</h2><p class="muted small"><strong>Quotable</strong> releases a family the sheet marks as NPI (or blocks one). <strong>Succeeded by</strong> marks a previous generation, left out unless "Include previous-generation models" is ticked. Kept across imports.</p></div></div>
   <div class="table-wrap"><table class="table">
     <thead><tr><th scope="col">Family</th><th scope="col">Models</th><th scope="col">In sheet</th><th scope="col">Quotable</th><th scope="col">Succeeded by</th><th scope="col"><span class="sr-only">Save</span></th></tr></thead>
     <tbody>
     {% for f in families %}
       <tr>
-        <th scope="row">{{ f.family }}</th>
+        <th scope="row" class="nowrap">{{ f.family }}{% if f.superseded_by %}<br><span class="chip chip-warn xs" style="margin-top:4px">previous gen</span>{% endif %}</th>
         <td class="small">{{ f.quotable_models }} of {{ f.models }} quotable<br><span class="muted">{{ f.names }}</span></td>
-        <td class="small">{% if f.sheet_npi == f.models %}NPI{% elif f.sheet_npi %}{{ f.sheet_npi }} NPI{% else %}released{% endif %}</td>
+        <td class="small">{% if f.sheet_npi == f.models %}<span class="chip">NPI</span>{% elif f.sheet_npi %}<span class="chip">{{ f.sheet_npi }} NPI</span>{% else %}<span class="chip chip-good">released</span>{% endif %}</td>
         <td>
           <form method="post" action="/portfolio/families/{{ f.family }}" id="fam-{{ loop.index }}"></form>
           <label class="sr-only" for="q-{{ loop.index }}">Quotable for {{ f.family }}</label>
-          <select id="q-{{ loop.index }}" name="quotable" form="fam-{{ loop.index }}">
+          <select id="q-{{ loop.index }}" name="quotable" form="fam-{{ loop.index }}" style="min-width:120px">
             <option value="" {% if f.quotable is none %}selected{% endif %}>as in sheet</option>
             <option value="yes" {% if f.quotable == 1 %}selected{% endif %}>yes</option>
             <option value="no" {% if f.quotable == 0 %}selected{% endif %}>no</option>
@@ -85,14 +107,14 @@
         </td>
         <td>
           <label class="sr-only" for="s-{{ loop.index }}">{{ f.family }} succeeded by</label>
-          <select id="s-{{ loop.index }}" name="superseded_by" form="fam-{{ loop.index }}">
-            <option value="">– (current generation)</option>
+          <select id="s-{{ loop.index }}" name="superseded_by" form="fam-{{ loop.index }}" style="min-width:190px">
+            <option value="">– current generation</option>
             {% for other in families if other.family != f.family %}
             <option value="{{ other.family }}" {% if f.superseded_by == other.family %}selected{% endif %}>{{ other.family }}</option>
             {% endfor %}
           </select>
         </td>
-        <td><button class="btn btn-quiet" type="submit" form="fam-{{ loop.index }}">Save</button></td>
+        <td><button class="btn" type="submit" form="fam-{{ loop.index }}">Save</button></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -101,13 +123,15 @@
 {% endif %}
 
 {% if models %}
-<section aria-labelledby="models-h">
-  <h2 id="models-h">Models ({{ models|length }})</h2>
-  <div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">Model</th><th scope="col">Family</th><th scope="col">Kind</th><th scope="col">Lifecycle</th><th scope="col">Quotable</th><th scope="col">Generation</th></tr></thead>
-    <tbody>{% for m in models %}<tr><th scope="row">{{ m.name }}</th><td>{{ m.family or '–' }}</td><td>{{ m.kind }}</td><td>{{ m.lifecycle }}</td><td>{{ 'yes' if m.customer_quotable else 'no' }}</td><td>{% if m.superseded_by %}previous (→ {{ m.superseded_by }}){% else %}current{% endif %}</td></tr>{% endfor %}</tbody>
-  </table></div>
-  <p class="small muted">Lifecycle and quotable status can be changed with <code>tsf-sizer set-model</code> inside the container.</p>
+<section class="card reveal" aria-labelledby="models-h">
+  <details class="more">
+    <summary>{{ icon('chevron-down', 'icon-sm') }}<span id="models-h">All models ({{ models|length }})</span></summary>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th scope="col">Model</th><th scope="col">Family</th><th scope="col">Kind</th><th scope="col">Lifecycle</th><th scope="col">Quotable</th><th scope="col">Generation</th></tr></thead>
+      <tbody>{% for m in models %}<tr><th scope="row">{{ m.name }}</th><td>{{ m.family or '–' }}</td><td>{{ m.kind }}</td><td>{{ m.lifecycle }}</td><td>{% if m.customer_quotable %}<span class="status status-ok">yes</span>{% else %}<span class="status status-muted">no</span>{% endif %}</td><td>{% if m.superseded_by %}previous (→ {{ m.superseded_by }}){% else %}current{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="small muted" style="margin-top:8px">Lifecycle and quotable status of single models: <code>tsf-sizer set-model</code> inside the container.</p>
+  </details>
 </section>
 {% endif %}
 {% endblock %}

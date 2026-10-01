@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 DEFAULT_DB_PATH = "data/app.db"
@@ -158,11 +159,29 @@ def db_path(path: str | os.PathLike | None = None) -> Path:
     return Path(path or os.environ.get("TSF_SIZER_DB") or DEFAULT_DB_PATH)
 
 
+_initialized: set[str] = set()
+_init_lock = threading.Lock()
+
+
 def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
+    """Open the database. The schema is applied once per database per process:
+    it recreates a view, which takes a write lock, so it must not run on every
+    request while background jobs write results."""
     p = db_path(path)
-    if str(p) != ":memory:":
+    memory = str(p) == ":memory:"
+    if not memory:
         p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(p)
+    conn = sqlite3.connect(p, timeout=15)
     conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+    conn.execute("PRAGMA busy_timeout = 15000")
+    key = str(p.resolve()) if not memory else None
+    if memory:
+        conn.executescript(SCHEMA)
+    elif key not in _initialized:
+        with _init_lock:
+            if key not in _initialized:
+                conn.execute("PRAGMA journal_mode = WAL")  # readers don't block the writer
+                conn.executescript(SCHEMA)
+                _initialized.add(key)
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn

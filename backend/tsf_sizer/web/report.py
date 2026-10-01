@@ -121,25 +121,44 @@ def build(result: dict, row: dict) -> dict:
     picks = ([sizing["recommended"]] if sizing.get("recommended") else []) + sizing.get(
         "alternatives", []
     )
+    current_caps = {r["metric"]: r.get("current_capacity") for r in sizing.get("requirements", [])}
+    spec_defs = (
+        ("perf.throughput_threat_gbps", "Threat throughput", "Gbps"),
+        ("perf.throughput_appid_gbps", "App-ID throughput", "Gbps"),
+        ("perf.sessions", "Sessions", ""),
+        ("perf.cps", "Connections/s", ""),
+    )
+    # Common scale per spec across all cards, so bars compare between models too.
+    scale: dict[str, float] = {}
+    for cand in picks:
+        for c in cand["checks"]:
+            if c.get("candidate_capacity") is not None:
+                scale[c["metric"]] = max(
+                    scale.get(c["metric"], 0),
+                    c["candidate_capacity"],
+                    current_caps.get(c["metric"]) or 0,
+                )
     for tier, cand in zip(TIERS, picks, strict=False):
         checks = {c["metric"]: c for c in cand["checks"]}
         specs = []
-        for key, label, unit in (
-            ("perf.throughput_threat_gbps", "Threat throughput", "Gbps"),
-            ("perf.throughput_appid_gbps", "App-ID throughput", "Gbps"),
-            ("perf.sessions", "Sessions", ""),
-            ("perf.cps", "Connections/s", ""),
-        ):
+        for key, label, unit in spec_defs:
             c = checks.get(key)
-            if c and c.get("candidate_capacity") is not None:
-                specs.append(
-                    {
-                        "label": label,
-                        "value": fmt_num(c["candidate_capacity"]),
-                        "unit": unit,
-                        "headroom": c.get("headroom_pct"),
-                    }
-                )
+            if not c or c.get("candidate_capacity") is None:
+                continue
+            top = scale.get(key) or 1
+            cur = current_caps.get(key)
+            specs.append(
+                {
+                    "label": label,
+                    "value": fmt_num(c["candidate_capacity"]),
+                    "unit": unit,
+                    "headroom": c.get("headroom_pct"),
+                    "pct": round(100 * c["candidate_capacity"] / top, 1),
+                    "current_pct": round(100 * cur / top, 1) if cur else None,
+                    "current": fmt_num(cur) if cur else None,
+                    "times": round(c["candidate_capacity"] / cur, 1) if cur else None,
+                }
+            )
         plan = cand.get("port_plan", {})
         avail = plan.get("available", {})
         cards.append(
@@ -154,6 +173,7 @@ def build(result: dict, row: dict) -> dict:
                 "dedicated_ha": plan.get("dedicated_ha"),
                 "variants": cand.get("extra_variants", []),
                 "unknown_features": cand.get("unknown_features", []),
+                "too_large": cand.get("too_large"),
             }
         )
 

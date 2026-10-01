@@ -1,27 +1,35 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Analysis {{ a.id }} · TSF Sizer{% endblock %}
 {% block content %}
-<h1>Analysis {{ a.id }}</h1>
-<p class="muted">{{ a.filename }}{% if a.customer %} · {{ a.customer }}{% endif %}</p>
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis #{{ a.id }}</p>
+    <h1>{{ 'The analysis failed' if a.status == 'error' else 'Analyzing the TSF…' }}</h1>
+    <p>{{ a.filename }}{% if a.customer %} · {{ a.customer }}{% endif %}</p>
+  </div>
+</header>
 
 {% if a.status == 'error' %}
 <div class="callout callout-error" role="alert">
-  <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+  {{ icon('x-circle') }}
   <div>
     <strong>The analysis failed.</strong>
     <p>{{ a.error }}</p>
     <p>Check that the file is a Tech Support File from a PAN-OS firewall (or the <code>techsupport_*.txt</code> from it), then <a href="/">try again</a>.</p>
   </div>
 </div>
-<form method="post" action="/analyses/{{ a.id }}/delete"><button class="btn" type="submit">Delete this entry</button></form>
+<form method="post" action="/analyses/{{ a.id }}/delete"><button class="btn" type="submit">{{ icon('trash') }}<span>Delete this entry</span></button></form>
 {% else %}
-<div class="card progress-card" role="status" aria-live="polite">
-  <div class="spinner" aria-hidden="true"></div>
-  <div>
-    <strong id="status-text">{{ 'Waiting to start…' if a.status == 'queued' else 'Reading the TSF and sizing…' }}</strong>
-    <p class="muted">This page updates by itself. Large TSFs take up to a minute.</p>
+<section class="card progress" role="status" aria-live="polite">
+  <div class="stepper">
+    <div class="step done"><span class="bullet">{{ icon('check', 'icon-sm') }}</span>Upload received</div>
+    <div class="step active" id="step-read"><span class="bullet"><span class="spinner"></span></span><span id="status-text">{{ 'Waiting to start…' if a.status == 'queued' else 'Reading CLI output, config and ports…' }}</span></div>
+    <div class="step"><span class="bullet">{{ icon('gauge', 'icon-sm') }}</span>Sizing against the portfolio</div>
+    <div class="step"><span class="bullet">{{ icon('file', 'icon-sm') }}</span>Building the report</div>
   </div>
-</div>
+  <p class="muted small">This page updates by itself. Large TSFs take up to a minute.</p>
+</section>
 <noscript><meta http-equiv="refresh" content="3"></noscript>
 {% endif %}
 {% endblock %}
@@ -32,8 +40,8 @@
     fetch('/api/analyses/{{ a.id }}').then(function (r) { return r.json(); }).then(function (d) {
       if (d.status === 'done' || d.status === 'error') { location.reload(); return; }
       document.getElementById('status-text').textContent =
-        d.status === 'queued' ? 'Waiting to start…' : 'Reading the TSF and sizing…';
-      setTimeout(poll, 1500);
+        d.status === 'queued' ? 'Waiting to start…' : 'Reading CLI output, config and ports…';
+      setTimeout(poll, 1200);
     }).catch(function () { setTimeout(poll, 3000); });
   })();
 </script>

@@ -138,6 +138,7 @@ def test_not_found_and_delete(client):
 def test_portfolio_page_and_reimport(client, workbook):
     page = client.get("/portfolio?imported=1")
     assert "Import report, document 1" in page.text and "PA-3430" in page.text
+    assert "Activate this version" not in page.text  # already active
     assert "Features_Capacities_12_1_2_Test.xlsx" in client.get("/portfolio").text
     with workbook.open("rb") as fh:
         r = client.post(
