@@ -53,10 +53,21 @@ Defaults can be changed per analysis under *Sizing assumptions and known peaks*.
 
 - Capacities must cover usage × growth (default 20 %/year over 3 years).
 - Throughput, connections/s and sessions are sized to stay under the target utilization (default 70 %), and must be **higher** than the current model's.
-- Every other limit must be **at least** the current model's.
+- Object, rule and interface counts must be **at least** the current model's. Per-item limits (members per address group, members per aggregate) only need to cover actual usage.
 - Ports: by default at least the current model's full port layout; optionally only the ports in use. HA links on data ports are freed when the new model has dedicated HA ports.
 - Features in use (HA mode, GTP, SCTP, …) must be supported.
 - Unreleased (NPI) models and chassis cards are never recommended.
+- **Previous generations** (e.g. PA-400, succeeded by PA-500) are left out unless *Include previous-generation models* is ticked on the analysis form.
+- **No oversizing:** models with more than 5× the current model's throughput (or 5× the requirement, if that is higher) are listed as "too large" instead of recommended. Change the factor under *Sizing assumptions*.
+
+### Family settings (Portfolio page)
+
+Team knowledge the workbook doesn't contain is set per family on the Portfolio page and kept across workbook imports:
+
+- **Quotable**: release a family the sheet still marks as NPI, or block one. Default: PA-500 released.
+- **Succeeded by**: mark a family as previous generation. Default: PA-400 succeeded by PA-500.
+
+The same is available on the command line inside the container: `docker exec tsf-sizer tsf-sizer set-family PA-5400 --superseded-by PA-5500`.
 
 **The TSF only has a throughput/CPS snapshot**: enter the customer's known peaks for a reliable performance sizing. The report is a draft for the engineer to review.
 

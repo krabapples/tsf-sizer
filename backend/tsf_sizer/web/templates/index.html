@@ -37,6 +37,18 @@
           <option value="used">Only the ports in use</option>
         </select>
       </div>
+      {% if superseded %}
+      <div class="field">
+        <span class="label">Model generations</span>
+        <label class="check switch" for="include_superseded">
+          <input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch">
+          <span>Include previous-generation models
+            <span class="hint-inline">({% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %})</span>
+          </span>
+        </label>
+        <p class="hint">Off: only the current generation is recommended. Turn on when the customer still wants the older series.</p>
+      </div>
+      {% endif %}
     </div>
 
     <details class="advanced">
@@ -54,6 +66,11 @@
           <label for="target_util_pct">Target utilization (%)</label>
           <input id="target_util_pct" name="target_util_pct" type="number" min="10" max="100" step="5" value="{{ defaults.target_util_pct|int }}">
           <p class="hint">Performance is sized so the peak stays below this.</p>
+        </div>
+        <div class="field">
+          <label for="max_size_factor">Maximum size (× current performance)</label>
+          <input id="max_size_factor" name="max_size_factor" type="number" min="0" max="100" step="0.5" value="{{ defaults.max_size_factor|num }}">
+          <p class="hint">Models with more throughput than this are "too large" and not recommended. 0 = no limit.</p>
         </div>
         <div class="field">
           <label for="peak_throughput_mbps">Known peak throughput (Mbps)</label>

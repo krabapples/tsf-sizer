@@ -231,6 +231,30 @@ def _cmd_analyze(args) -> int:
     return 0
 
 
+def _cmd_set_family(args) -> int:
+    conn = db.connect(args.db)
+    current = {f["family"]: f for f in catalog.list_families(conn)}
+    if args.family not in current:
+        print(f"Unknown family {args.family}. Known: {', '.join(current)}", file=sys.stderr)
+        return 1
+    f = current[args.family]
+    quotable = (
+        f["quotable"]
+        if args.quotable is None
+        else (None if args.quotable == "sheet" else int(args.quotable == "yes"))
+    )
+    successor = f["superseded_by"] if args.superseded_by is None else (args.superseded_by or None)
+    if successor is not None and successor not in current:
+        print(f"Unknown successor family {successor}", file=sys.stderr)
+        return 1
+    catalog.set_family(conn, args.family, quotable=quotable, superseded_by=successor)
+    print(
+        f"{args.family}: quotable={'sheet' if quotable is None else bool(quotable)}, "
+        f"succeeded by {successor or '-'}"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tsf-sizer")
     p.add_argument("--db", help=f"SQLite path (default $TSF_SIZER_DB or {db.DEFAULT_DB_PATH})")
@@ -269,6 +293,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--json", help="Also write the full result as JSON")
     s.set_defaults(func=_cmd_analyze)
+
+    s = sub.add_parser("set-family", help="Team settings for a product family")
+    s.add_argument("family")
+    s.add_argument("--quotable", choices=["yes", "no", "sheet"])
+    s.add_argument("--superseded-by", help="Successor family ('' to clear)")
+    s.set_defaults(func=_cmd_set_family)
 
     s = sub.add_parser("set-model", help="Set team-maintained metadata for a model")
     s.add_argument("model")

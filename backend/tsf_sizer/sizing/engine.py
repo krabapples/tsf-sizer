@@ -7,6 +7,9 @@ Rules (the team's sizing policy):
     port layout; optionally only the ports actually in use
   * features in use (HA mode, GTP, SCTP, ...) must be supported
   * only quotable models (not NPI, not chassis components) are considered
+  * previous-generation families are left out unless the user includes them
+  * models far larger than needed (max_size_factor x the current performance)
+    are not recommended
 """
 
 from __future__ import annotations
@@ -21,6 +24,17 @@ from ..tsf.compare import resolve_port_media
 from ..tsf.metrics import TsfSummary
 
 PERF_METRICS = ("perf.throughput", "perf.cps", "perf.sessions")
+
+# Per-item limits (how big one group/aggregate may be) are not object counts: they
+# only need to cover usage x growth, not the current model's figure. Without this,
+# a successor generation with a lower per-group limit is rejected for a limit the
+# customer doesn't use.
+BASELINE_EXEMPT = frozenset(
+    {
+        "config.max_address_group_members",
+        "config.max_aggregate_members",
+    }
+)
 
 # Which candidate port classes can serve a needed port class (best fit first).
 PORT_COMPAT: dict[str, tuple[str, ...]] = {
@@ -63,6 +77,11 @@ class SizingParams:
     peak_sessions: float | None = None
     port_rule: str = "all"  # "all": current model's full port layout; "used": ports in use
     include_npi: bool = False
+    # Previous-generation families (family_setting.superseded_by) are left out unless included.
+    include_superseded: bool = False
+    # A candidate may offer at most this many times the performance of the current model
+    # (or of the requirement, if higher). 0 disables the cap.
+    max_size_factor: float = 5.0
 
     @property
     def growth_factor(self) -> float:
@@ -107,6 +126,7 @@ class Candidate:
     tightest: list[str] = field(default_factory=list)
     unconfirmed_used: list[str] = field(default_factory=list)
     extra_variants: list[str] = field(default_factory=list)
+    too_large: str | None = None
     unknown_features: list[str] = field(default_factory=list)
     sort_key: float = 0.0
 
@@ -122,6 +142,9 @@ class SizingResult:
     recommended: Candidate | None = None
     alternatives: list[Candidate] = field(default_factory=list)
     rejected: list[Candidate] = field(default_factory=list)
+    too_large: list[Candidate] = field(default_factory=list)
+    excluded_families: dict = field(default_factory=dict)
+    size_cap_gbps: float | None = None
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -316,7 +339,7 @@ def _check(req: Requirement, cap: dict | None) -> Check:
     reasons = []
     if num < required:
         reasons.append(f"needs {_fmt(required)}, has {_fmt(num)}")
-    if req.current_capacity is not None:
+    if req.current_capacity is not None and req.metric not in BASELINE_EXEMPT:
         if req.is_perf and num <= req.current_capacity:
             reasons.append(f"not more than current model ({_fmt(req.current_capacity)})")
         elif not req.is_perf and num < req.current_capacity:
@@ -447,9 +470,23 @@ def size(
         if k.startswith("feature.") and v.value is True
     }
 
+    superseded = catalog.superseded_families(conn)
+    thr_req = next((r for r in reqs if r.metric.startswith("perf.throughput")), None)
+    size_cap = None
+    if params.max_size_factor and thr_req is not None:
+        base = max(thr_req.required, thr_req.current_capacity or 0)
+        if thr_req.current_capacity:
+            size_cap = round(base * params.max_size_factor, 3)
+        else:
+            result.notes.append("Size cap not applied: the current model's throughput is unknown.")
+    result.size_cap_gbps = size_cap
+
     candidates = []
     for model in catalog.list_models(conn, quotable_only=not params.include_npi):
         if model["kind"] == "component" or model["name"] == current:
+            continue
+        if model["family"] in superseded and not params.include_superseded:
+            result.excluded_families[model["family"]] = superseded[model["family"]]
             continue
         caps = catalog.mapped_capacities(conn, model["name"], document_id)
         if not caps or not any(c["kind"] for c in caps.values()):
@@ -499,6 +536,11 @@ def size(
         )
         cand.sort_key = thr if thr is not None else float("inf")
         cand.extra_variants = sorted(variants(model["name"]) - variants(current or ""))
+        if size_cap is not None and thr is not None and thr > size_cap:
+            cand.too_large = (
+                f"{_fmt(thr)} Gbps is more than {params.max_size_factor:g}x the current "
+                f"{current}'s {_fmt(thr_req.current_capacity)} Gbps (cap {_fmt(size_cap)} Gbps)"
+            )
         candidates.append(cand)
 
     # Smallest passing model first; special-purpose variants (5G, rugged, PoE) only
@@ -506,30 +548,35 @@ def size(
     def order(c: Candidate):
         return (bool(c.extra_variants), c.sort_key, c.model)
 
-    passing = sorted([c for c in candidates if c.passes], key=order)
+    passing = sorted([c for c in candidates if c.passes and not c.too_large], key=order)
+    oversized = sorted([c for c in candidates if c.passes and c.too_large], key=order)
     failing = sorted([c for c in candidates if not c.passes], key=lambda c: (c.sort_key, c.model))
     if passing:
         result.recommended = passing[0]
         result.alternatives = _alternatives(passing)
+    elif oversized:
+        # Nothing within the size cap qualifies: offer the smallest model that does.
+        result.recommended = oversized.pop(0)
+        result.notes.append(
+            f"No model within the size cap qualifies; {result.recommended.model} is the smallest "
+            "that meets every rule but is far larger than the current model."
+        )
     else:
         result.notes.append("No quotable model meets every rule; see the rejected list.")
+    for fam, successor in sorted(result.excluded_families.items()):
+        result.notes.append(
+            f"{fam} series left out: superseded by the {successor} series. Tick 'Include "
+            "previous-generation models' to consider it."
+        )
     result.rejected = failing
+    result.too_large = oversized
     return result
 
 
 def _alternatives(passing: list[Candidate]) -> list[Candidate]:
-    """'Better': the next passing model up. 'Best': the first passing model of a
-    larger family, for customers who want more headroom."""
-    rec = passing[0]
-    standard = [c for c in passing[1:] if not c.extra_variants] or passing[1:]
-    out: list[Candidate] = []
-    if standard:
-        out.append(standard[0])
-    bigger = [
-        c for c in standard if c.family != rec.family and c not in out and c.sort_key > rec.sort_key
-    ]
-    if bigger:
-        out.append(bigger[0])
-    elif len(standard) > 1:
-        out.append(standard[1])
-    return out
+    """'Better' and 'Best': the next two steps up within the size cap. Special-purpose
+    variants (PoE, 5G, rugged) only appear when no standard model is left."""
+    rest = [c for c in passing[1:] if c.sort_key >= passing[0].sort_key]  # steps up only
+    standard = [c for c in rest if not c.extra_variants]
+    variant = [c for c in rest if c.extra_variants]
+    return (standard or variant)[:2]

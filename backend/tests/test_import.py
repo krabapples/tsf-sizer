@@ -40,12 +40,17 @@ def test_models_split_components_and_npi(conn, workbook):
     assert models["PA-7500 MPC"]["kind"] == "component"
     assert models["PA-7500 MPC"]["parent_model_id"] == models["PA-7500"]["id"]
     assert models["PA-7500 MPC"]["customer_quotable"] == 0
-    assert models["PA-540"]["lifecycle"] == "npi"
-    assert models["PA-540"]["customer_quotable"] == 0
+    # The sheet says NPI, but the team default releases the PA-500 family ...
+    assert models["PA-540"]["lifecycle"] == "current"
+    assert models["PA-540"]["customer_quotable"] == 1
+    # ... while a model-level NPI mark in another family still holds.
+    assert models["PA-455R-5G"]["customer_quotable"] == 0
+    assert models["PA-5550"]["customer_quotable"] == 0
     assert models["PA-450R-5G"]["family"] == "PA-400"
+    assert models["PA-450R-5G"]["superseded_by"] == "PA-500"
     assert models["PA-5550"]["family"] == "PA-5500"
     quotable = {r["name"] for r in catalog.list_models(conn, quotable_only=True)}
-    assert quotable == {"PA-7500", "PA-3430", "PA-450R", "PA-450R-5G"}
+    assert quotable == {"PA-7500", "PA-3430", "PA-450R", "PA-450R-5G", "PA-540"}
     assert any("PA-505" in w and "PA-510" in w for w in report.warnings)
 
 
@@ -232,6 +237,9 @@ def test_cli_roundtrip(tmp_path, workbook, capsys):
     out = capsys.readouterr().out
     assert "Security rulebase" in out and "[unconfirmed]" in out
     assert cli_main(["--db", dbp, "set-model", "PA-540", "--quotable", "yes"]) == 0
+    assert cli_main(["--db", dbp, "set-family", "PA-400", "--superseded-by", ""]) == 0
+    assert cli_main(["--db", dbp, "set-family", "PA-400", "--quotable", "sheet"]) == 0
+    assert cli_main(["--db", dbp, "set-family", "PA-9"]) == 1
     assert cli_main(["--db", dbp, "models"]) == 0
     assert "PA-540" in capsys.readouterr().out
 

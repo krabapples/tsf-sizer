@@ -62,12 +62,50 @@
   {% else %}<p class="muted">Nothing imported yet.</p>{% endif %}
 </section>
 
+{% if families %}
+<section aria-labelledby="fam-h" id="families">
+  <h2 id="fam-h">Model families</h2>
+  <p class="small muted">Team settings that override the workbook. <strong>Quotable</strong> releases a family the sheet marks as NPI (or blocks one). <strong>Succeeded by</strong> marks a previous generation: it is left out of recommendations unless "Include previous-generation models" is ticked on the analysis form. Settings are kept when a new workbook is imported.</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th scope="col">Family</th><th scope="col">Models</th><th scope="col">In sheet</th><th scope="col">Quotable</th><th scope="col">Succeeded by</th><th scope="col"><span class="sr-only">Save</span></th></tr></thead>
+    <tbody>
+    {% for f in families %}
+      <tr>
+        <th scope="row">{{ f.family }}</th>
+        <td class="small">{{ f.quotable_models }} of {{ f.models }} quotable<br><span class="muted">{{ f.names }}</span></td>
+        <td class="small">{% if f.sheet_npi == f.models %}NPI{% elif f.sheet_npi %}{{ f.sheet_npi }} NPI{% else %}released{% endif %}</td>
+        <td>
+          <form method="post" action="/portfolio/families/{{ f.family }}" id="fam-{{ loop.index }}"></form>
+          <label class="sr-only" for="q-{{ loop.index }}">Quotable for {{ f.family }}</label>
+          <select id="q-{{ loop.index }}" name="quotable" form="fam-{{ loop.index }}">
+            <option value="" {% if f.quotable is none %}selected{% endif %}>as in sheet</option>
+            <option value="yes" {% if f.quotable == 1 %}selected{% endif %}>yes</option>
+            <option value="no" {% if f.quotable == 0 %}selected{% endif %}>no</option>
+          </select>
+        </td>
+        <td>
+          <label class="sr-only" for="s-{{ loop.index }}">{{ f.family }} succeeded by</label>
+          <select id="s-{{ loop.index }}" name="superseded_by" form="fam-{{ loop.index }}">
+            <option value="">– (current generation)</option>
+            {% for other in families if other.family != f.family %}
+            <option value="{{ other.family }}" {% if f.superseded_by == other.family %}selected{% endif %}>{{ other.family }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><button class="btn btn-quiet" type="submit" form="fam-{{ loop.index }}">Save</button></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+
 {% if models %}
 <section aria-labelledby="models-h">
   <h2 id="models-h">Models ({{ models|length }})</h2>
   <div class="table-wrap"><table class="table">
-    <thead><tr><th scope="col">Model</th><th scope="col">Family</th><th scope="col">Kind</th><th scope="col">Lifecycle</th><th scope="col">Quotable</th></tr></thead>
-    <tbody>{% for m in models %}<tr><th scope="row">{{ m.name }}</th><td>{{ m.family or '–' }}</td><td>{{ m.kind }}</td><td>{{ m.lifecycle }}</td><td>{{ 'yes' if m.customer_quotable else 'no' }}</td></tr>{% endfor %}</tbody>
+    <thead><tr><th scope="col">Model</th><th scope="col">Family</th><th scope="col">Kind</th><th scope="col">Lifecycle</th><th scope="col">Quotable</th><th scope="col">Generation</th></tr></thead>
+    <tbody>{% for m in models %}<tr><th scope="row">{{ m.name }}</th><td>{{ m.family or '–' }}</td><td>{{ m.kind }}</td><td>{{ m.lifecycle }}</td><td>{{ 'yes' if m.customer_quotable else 'no' }}</td><td>{% if m.superseded_by %}previous (→ {{ m.superseded_by }}){% else %}current{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div>
   <p class="small muted">Lifecycle and quotable status can be changed with <code>tsf-sizer set-model</code> inside the container.</p>
 </section>

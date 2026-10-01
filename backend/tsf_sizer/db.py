@@ -111,18 +111,46 @@ CREATE TABLE IF NOT EXISTS analysis (
     created_by   TEXT
 );
 
--- Effective model metadata: workbook-derived values with team overrides on top.
-CREATE VIEW IF NOT EXISTS model_effective AS
+-- Team-maintained settings per product family. Never overwritten by an import.
+--   quotable:       1/0 overrides the sheet's NPI status for the whole family
+--   superseded_by:  family that replaces this one; superseded families are
+--                   left out of recommendations unless the user includes them
+CREATE TABLE IF NOT EXISTS family_setting (
+    family        TEXT PRIMARY KEY,
+    quotable      INTEGER,
+    superseded_by TEXT,
+    notes         TEXT,
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Defaults from the presales team (2026-10): the PA-500 series is released and
+-- succeeds the PA-400. Inserted once; edits on the Portfolio page are kept.
+INSERT OR IGNORE INTO family_setting (family, quotable, superseded_by, notes) VALUES
+    ('PA-500', 1, NULL, 'Released; successor of the PA-400 series'),
+    ('PA-400', NULL, 'PA-500', 'Previous generation');
+
+-- Effective model metadata: workbook-derived values with family and model
+-- overrides on top (model override wins over family setting wins over sheet).
+DROP VIEW IF EXISTS model_effective;
+CREATE VIEW model_effective AS
 SELECT
     m.id, m.name, m.family, m.kind, m.parent_model_id, m.sheet_column,
-    COALESCE(o.lifecycle, m.sheet_lifecycle) AS lifecycle,
+    COALESCE(
+        o.lifecycle,
+        CASE WHEN f.quotable = 1 AND m.sheet_lifecycle = 'npi' THEN 'current' END,
+        m.sheet_lifecycle
+    ) AS lifecycle,
     COALESCE(
         o.customer_quotable,
-        CASE WHEN m.kind = 'component' OR m.sheet_lifecycle = 'npi' THEN 0 ELSE 1 END
+        CASE WHEN m.kind = 'component' THEN 0 END,
+        f.quotable,
+        CASE WHEN m.sheet_lifecycle = 'npi' THEN 0 ELSE 1 END
     ) AS customer_quotable,
+    f.superseded_by,
     o.eos_date, o.form_factor_ru, o.price_tier, o.notes
 FROM model m
-LEFT JOIN model_override o ON o.model_name = m.name;
+LEFT JOIN model_override o ON o.model_name = m.name
+LEFT JOIN family_setting f ON f.family = m.family;
 """
 
 

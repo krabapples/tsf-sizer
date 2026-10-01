@@ -131,9 +131,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             rec = (res.get("sizing") or {}).get("recommended")
             item["recommended"] = rec["model"] if rec else None
             history.append(item)
+        with conn() as c:
+            superseded = catalog.superseded_families(c)
         return render(
             request,
             "index.html",
+            superseded=superseded,
             portfolio=doc,
             history=history,
             defaults=SizingParams(),
@@ -152,6 +155,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         peak_cps: str = Form(""),
         peak_sessions: str = Form(""),
         port_rule: str = Form("all"),
+        include_superseded: str = Form(""),
+        max_size_factor: float = Form(5.0),
     ):
         def opt(v: str) -> float | None:
             v = v.strip().replace(",", "")
@@ -167,6 +172,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         if not (0 <= growth_pct <= 200 and 1 <= years <= 10 and 10 <= target_util_pct <= 100):
             raise HTTPException(400, "Growth 0-200%, years 1-10, target utilization 10-100%")
+        if not (max_size_factor == 0 or 1 < max_size_factor <= 100):
+            raise HTTPException(400, "Maximum size must be above 1x (or 0 for no limit)")
         params = SizingParams(
             growth_pct_per_year=growth_pct,
             years=years,
@@ -175,6 +182,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             peak_cps=opt(peak_cps),
             peak_sessions=opt(peak_sessions),
             port_rule="used" if port_rule == "used" else "all",
+            include_superseded=bool(include_superseded),
+            max_size_factor=max_size_factor,
         )
         tsf_path = await save_upload(tsf, ".tsf")
         config_path, config_name = None, None
@@ -248,6 +257,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with conn() as c:
             docs = catalog.list_documents(c)
             models = catalog.list_models(c)
+            families = catalog.list_families(c)
             report = None
             if imported:
                 r = c.execute(
@@ -257,6 +267,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return render(
             request,
             "portfolio.html",
+            families=families,
             docs=docs,
             models=models,
             report=report,
@@ -287,6 +298,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             path.unlink(missing_ok=True)
         return RedirectResponse(f"/portfolio?imported={rep.document_id}", status_code=303)
+
+    @app.post("/portfolio/families/{family}")
+    def update_family(family: str, quotable: str = Form(""), superseded_by: str = Form("")):
+        with conn() as c:
+            known = {f["family"] for f in catalog.list_families(c)}
+            if family not in known:
+                raise HTTPException(404, "Unknown family")
+            successor = superseded_by.strip() or None
+            if successor is not None and (successor not in known or successor == family):
+                raise HTTPException(400, "Successor must be another family in the portfolio")
+            q = {"yes": 1, "no": 0}.get(quotable)
+            catalog.set_family(c, family, quotable=q, superseded_by=successor)
+        return RedirectResponse(f"/portfolio?msg=Saved settings for {family}", status_code=303)
 
     @app.post("/portfolio/{document_id}/activate")
     def activate_document(document_id: int):

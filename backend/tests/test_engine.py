@@ -112,7 +112,7 @@ def test_check_rules():
 
 def test_size_recommends_bigger_model_with_matching_ports(sized_db):
     s = summary_as("PA-450R")
-    result = size(sized_db, s, SizingParams())
+    result = size(sized_db, s, SizingParams(include_superseded=True, max_size_factor=0))
     assert result.current_in_portfolio
     assert result.recommended is not None and result.recommended.model == "PA-3430"
     rej = {c.model: c.failures for c in result.rejected}
@@ -120,9 +120,67 @@ def test_size_recommends_bigger_model_with_matching_ports(sized_db):
     assert any("not more than current" in f for f in rej["PA-450R-5G"])
     # Chassis without front-panel ports in the sheet cannot take the 8 copper ports.
     assert any(f.startswith("Ports: missing") for f in rej["PA-7500"])
-    # NPI models are never candidates.
-    assert "PA-540" not in rej and "PA-5550" not in rej
+    # NPI models are never candidates; PA-540 is released by the family default.
+    assert "PA-5550" not in rej and "PA-455R-5G" not in rej
+    assert "PA-540" in rej
     assert result.ports_needed["baseline"] == {"1G_RJ45": 8}
+
+
+def test_previous_generation_left_out_unless_included(sized_db):
+    s = summary_as("PA-3430")
+    off = size(sized_db, s, SizingParams(max_size_factor=0))
+    considered = {c.model for c in off.rejected + off.too_large}
+    assert not {"PA-450R", "PA-450R-5G"} & considered
+    assert off.excluded_families == {"PA-400": "PA-500"}
+    assert any("PA-400 series left out" in n for n in off.notes)
+    on = size(sized_db, s, SizingParams(include_superseded=True, max_size_factor=0))
+    considered = {c.model for c in on.rejected + on.too_large}
+    assert {"PA-450R", "PA-450R-5G"} <= considered
+    assert on.excluded_families == {}
+
+
+def test_size_cap_marks_oversized_models(sized_db):
+    s = summary_as("PA-450R")  # PA-450R: 1.4 Gbps threat; PA-3430: 15 Gbps
+    # Small known peak: the cap is then based on the current model (5 x 1.4 Gbps).
+    result = size(sized_db, s, SizingParams(max_size_factor=5, peak_throughput_mbps=300))
+    assert result.size_cap_gbps == 7.0
+    # The only qualifying model is too large; it is still offered, with a note.
+    assert result.recommended.model == "PA-3430"
+    assert result.recommended.too_large and "more than 5x" in result.recommended.too_large
+    assert any("No model within the size cap" in n for n in result.notes)
+    roomy = size(sized_db, s, SizingParams(max_size_factor=20, peak_throughput_mbps=300))
+    assert roomy.recommended.model == "PA-3430" and roomy.recommended.too_large is None
+    assert not any("size cap" in n for n in roomy.notes)
+    # A requirement above the current model raises the cap with it.
+    big = size(
+        sized_db,
+        s,
+        SizingParams(max_size_factor=5, peak_throughput_mbps=2000, growth_pct_per_year=0),
+    )
+    assert big.size_cap_gbps == pytest.approx(2.0 / 0.7 * 5, abs=0.01)
+
+
+def test_per_item_limits_only_need_usage():
+    req = _req(
+        metric="config.max_address_group_members", observed=0, required=0, current_capacity=2500
+    )
+    assert _check(req, _cap(num_value=1000, raw_value="1000")).status == "pass"
+    count = _req(metric="config.address_objects", observed=0, required=0, current_capacity=2500)
+    assert _check(count, _cap(num_value=1000, raw_value="1000")).status == "fail"
+
+
+def test_alternatives_are_steps_up_only():
+    from tsf_sizer.sizing.engine import Candidate, _alternatives
+
+    def cand(name, size, variant=False):
+        return Candidate(name, "F", True, sort_key=size, extra_variants=["PoE"] if variant else [])
+
+    picks = _alternatives(
+        [cand("A", 4.5), cand("B", 3.0, True), cand("C", 6.0), cand("D", 7.0, True)]
+    )
+    assert [c.model for c in picks] == ["C"]
+    only_variants = _alternatives([cand("A", 4.5), cand("B", 5.0, True), cand("D", 7.0, True)])
+    assert [c.model for c in only_variants] == ["B", "D"]
 
 
 def test_size_used_port_rule_and_growth(sized_db):

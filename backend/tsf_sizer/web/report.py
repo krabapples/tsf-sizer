@@ -202,6 +202,13 @@ def build(result: dict, row: dict) -> dict:
         ports.append(p)
 
     rejected = [
+        {
+            "model": c["model"],
+            "family": c.get("family"),
+            "reasons": ["Too large: " + c["too_large"]],
+        }
+        for c in sizing.get("too_large", [])
+    ] + [
         {"model": c["model"], "family": c.get("family"), "reasons": c["failures"]}
         for c in sizing.get("rejected", [])
     ]
@@ -225,6 +232,8 @@ def build(result: dict, row: dict) -> dict:
         "cards": cards,
         "req_rows": req_rows,
         "rejected": rejected,
+        "size_cap": sizing.get("size_cap_gbps"),
+        "excluded_families": sizing.get("excluded_families") or {},
         "history": history,
         "warnings": warnings,
         "ports": ports,

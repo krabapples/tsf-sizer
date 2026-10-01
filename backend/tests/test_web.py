@@ -175,3 +175,43 @@ def test_restart_marks_interrupted_jobs(tmp_path, monkeypatch):
     with c2:
         assert c2.get("/api/analyses/1").json()["status"] == "error"
         assert list((tmp_path / "uploads").iterdir()) == []
+
+
+def test_switch_and_size_cap_reach_the_engine(client):
+    page = client.get("/")
+    assert "Include previous-generation models" in page.text
+    assert "PA-400 series, succeeded by PA-500" in page.text
+    r = upload(client, include_superseded="1", max_size_factor="3")
+    analysis_id = int(r.headers["location"].rsplit("/", 1)[1])
+    assert wait_done(client, analysis_id)["status"] == "done"
+    params = client.get(f"/analyses/{analysis_id}/report.json").json()["sizing"]["params"]
+    assert params["include_superseded"] is True and params["max_size_factor"] == 3
+    assert upload(client, max_size_factor="1").status_code == 400
+
+
+def test_family_settings_page(client):
+    page = client.get("/portfolio")
+    assert "Model families" in page.text and "PA-500" in page.text
+    r = client.post(
+        "/portfolio/families/PA-400",
+        data={"quotable": "", "superseded_by": ""},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "Include previous-generation models" not in client.get("/").text
+    r = client.post(
+        "/portfolio/families/PA-400",
+        data={"quotable": "no", "superseded_by": "PA-500"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "PA-400 series, succeeded by PA-500" in client.get("/").text
+    assert (
+        client.post(
+            "/portfolio/families/PA-400", data={"superseded_by": "PA-400"}, follow_redirects=False
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post("/portfolio/families/PA-9", data={}, follow_redirects=False).status_code == 404
+    )

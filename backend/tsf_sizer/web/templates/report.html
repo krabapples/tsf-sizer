@@ -68,7 +68,13 @@
     </article>
     {% endfor %}
   </div>
-  <p class="small muted">Rules: every capacity ≥ usage × growth ({{ v.params.growth_pct_per_year|num }}%/year over {{ v.params.years }} years = ×{{ v.params.growth_factor|num(2) }}); performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model; every other limit at least the current model's; ports: {{ v.port_rule }}; features in use supported. Unreleased (NPI) models are excluded.</p>
+  <p class="small muted">Rules: every capacity ≥ usage × growth ({{ v.params.growth_pct_per_year|num }}%/year over {{ v.params.years }} years = ×{{ v.params.growth_factor|num(2) }});
+  performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model;
+  object, rule and interface counts at least the current model's (per-item limits such as members per address group only need to cover usage);
+  ports: {{ v.port_rule }}; features in use supported;
+  {% if v.size_cap %}at most {{ v.params.max_size_factor|num }}× the current performance ({{ v.size_cap|num }} Gbps);{% endif %}
+  {% if v.excluded_families %}previous generations left out ({% for fam, succ in v.excluded_families.items() %}{{ fam }} → {{ succ }}{% if not loop.last %}, {% endif %}{% endfor %});{% elif v.params.include_superseded %}previous generations included;{% endif %}
+  unreleased (NPI) models excluded.</p>
   {% else %}
   <div class="callout callout-warn" role="alert">
     <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
@@ -174,7 +180,7 @@
 <section aria-labelledby="rej-h">
   <h2 id="rej-h">Models that don't qualify</h2>
   <details class="more" data-print-open {% if not v.cards %}open{% endif %}>
-    <summary>{{ v.rejected|length }} models rejected, smallest first</summary>
+    <summary>{{ v.rejected|length }} models: too large or not meeting every rule</summary>
     <div class="table-wrap">
     <table class="table">
       <thead><tr><th scope="col">Model</th><th scope="col">Why not</th></tr></thead>

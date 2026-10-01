@@ -97,6 +97,10 @@ input[type="text"], input[type="number"], select, input[type="file"] {
   border-radius: 6px; padding: 8px 10px; min-height: 44px; width: 100%; }
 input[type="file"] { padding: 9px; }
 .hint { margin: 0; font-size: .8rem; color: var(--muted); }
+.label { font-weight: 600; font-size: .9rem; }
+.hint-inline { font-weight: 400; color: var(--muted); font-size: .85rem; }
+.switch { align-items: flex-start; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
+.switch input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex: none; }
 .check { display: flex; gap: var(--space-2); align-items: center; font-weight: 400; margin: var(--space-3) 0; min-height: 44px; }
 details.advanced, details.more { margin-top: var(--space-4); }
 details > summary { cursor: pointer; font-weight: 600; color: var(--primary); padding: var(--space-2) 0; min-height: 44px; display: flex; align-items: center; }

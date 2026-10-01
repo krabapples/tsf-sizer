@@ -92,3 +92,51 @@ def set_model_override(conn: sqlite3.Connection, model: str, **fields) -> None:
             f"ON CONFLICT(model_name) DO UPDATE SET {updates}, updated_at=datetime('now')",
             [model, *fields.values()],
         )
+
+
+def list_families(conn: sqlite3.Connection) -> list[dict]:
+    """Families found in the portfolio with their team settings and model counts."""
+    rows = conn.execute(
+        """SELECT m.family,
+                  count(*) AS models,
+                  sum(CASE WHEN m.sheet_lifecycle = 'npi' THEN 1 ELSE 0 END) AS sheet_npi,
+                  sum(CASE WHEN e.customer_quotable = 1 THEN 1 ELSE 0 END) AS quotable_models,
+                  group_concat(m.name, ', ') AS names,
+                  f.quotable, f.superseded_by, f.notes
+           FROM model m
+           JOIN model_effective e ON e.id = m.id
+           LEFT JOIN family_setting f ON f.family = m.family
+           WHERE m.kind != 'component' AND m.family IS NOT NULL
+           GROUP BY m.family ORDER BY m.family"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def superseded_families(conn: sqlite3.Connection) -> dict[str, str]:
+    """{family: successor} for families marked as previous generation."""
+    rows = conn.execute(
+        "SELECT family, superseded_by FROM family_setting "
+        "WHERE superseded_by IS NOT NULL AND superseded_by != ''"
+    ).fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
+def set_family(
+    conn: sqlite3.Connection,
+    family: str,
+    *,
+    quotable: int | None,
+    superseded_by: str | None,
+    notes: str | None = None,
+) -> None:
+    """Set a family's quotable override (None = follow the sheet) and successor."""
+    with conn:
+        conn.execute(
+            """INSERT INTO family_setting (family, quotable, superseded_by, notes)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(family) DO UPDATE SET quotable=excluded.quotable,
+                 superseded_by=excluded.superseded_by,
+                 notes=COALESCE(excluded.notes, family_setting.notes),
+                 updated_at=datetime('now')""",
+            (family, quotable, superseded_by or None, notes),
+        )
