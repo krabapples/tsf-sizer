@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Portfolio · TSF Sizer{% endblock %}
+{% block content %}
+<h1>Portfolio</h1>
+{% if msg %}<div class="callout {{ 'callout-error' if 'failed' in msg else 'callout-info' }}" role="status"><div>{{ msg }}</div></div>{% endif %}
+
+<section class="card" aria-labelledby="imp-h">
+  <h2 id="imp-h">Import a Features &amp; Capacities workbook</h2>
+  <form method="post" action="/portfolio" enctype="multipart/form-data">
+    <div class="field">
+      <label for="workbook">Workbook (.xlsx)</label>
+      <input id="workbook" name="workbook" type="file" accept=".xlsx" required>
+      <p class="hint">A new import is not used until you activate it. The file itself is not kept.</p>
+    </div>
+    <label class="check"><input type="checkbox" name="force" value="1"> Re-import if this file was imported before</label>
+    <div class="actions"><button type="submit" class="btn btn-primary">Import</button></div>
+  </form>
+</section>
+
+{% if report %}
+<section class="card" aria-labelledby="rep-h">
+  <h2 id="rep-h">Import report, document {{ report.document_id }}</h2>
+  <dl class="facts">
+    <div><dt>Sheet</dt><dd>{{ report.sheet_name }} (PAN-OS {{ report.panos_release }})</dd></div>
+    <div><dt>Attributes</dt><dd>{{ report.attribute_count }}</dd></div>
+    <div><dt>Cells</dt><dd>{{ report.cell_count|num }}</dd></div>
+    <div><dt>Unconfirmed cells</dt><dd>{{ report.unconfirmed_count }}</dd></div>
+    <div><dt>Needs review</dt><dd>{{ report.needs_review_total }}</dd></div>
+    <div><dt>TSF mappings</dt><dd>{{ report.tsf_map_resolved }} resolved, {{ report.tsf_map_unresolved|length }} unresolved</dd></div>
+  </dl>
+  {% for group, names in report.models.items() %}<p class="small"><strong>{{ group }}:</strong> {{ names|join(', ') or '–' }}</p>{% endfor %}
+  {% if report.diff %}<p class="small"><strong>Changes vs document {{ report.diff.previous_document_id }}:</strong> {{ report.diff.changed_total }} changed, {{ report.diff.added_total }} added, {{ report.diff.removed_total }} removed.</p>{% endif %}
+  {% if report.needs_review %}
+  <details class="more"><summary>{{ report.needs_review_total }} cells need a decision</summary>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th scope="col">Reason</th><th scope="col">Model</th><th scope="col">Attribute</th><th scope="col">Value</th></tr></thead>
+      <tbody>{% for i in report.needs_review %}<tr><td>{{ i.reason }}</td><td>{{ i.model }}</td><td>{{ i.attribute }}</td><td><code>{{ i.raw }}</code></td></tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+  {% endif %}
+  {% if not report.activated %}
+  <form method="post" action="/portfolio/{{ report.document_id }}/activate"><button class="btn btn-primary" type="submit">Activate this version</button></form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section aria-labelledby="docs-h">
+  <h2 id="docs-h">Imported versions</h2>
+  {% if docs %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th scope="col">#</th><th scope="col">File</th><th scope="col">Release</th><th scope="col">Imported (UTC)</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+      <tr>
+        <td><a href="/portfolio?imported={{ d.id }}">{{ d.id }}</a></td><td>{{ d.filename }}</td><td>{{ d.panos_release }}</td><td>{{ d.imported_at }}</td>
+        <td>{% if d.is_active %}<span class="badge badge-done">active</span>{% else %}<span class="badge">inactive</span>{% endif %}</td>
+        <td>{% if not d.is_active %}<form method="post" action="/portfolio/{{ d.id }}/activate"><button class="btn btn-quiet" type="submit">Activate</button></form>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Nothing imported yet.</p>{% endif %}
+</section>
+
+{% if models %}
+<section aria-labelledby="models-h">
+  <h2 id="models-h">Models ({{ models|length }})</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th scope="col">Model</th><th scope="col">Family</th><th scope="col">Kind</th><th scope="col">Lifecycle</th><th scope="col">Quotable</th></tr></thead>
+    <tbody>{% for m in models %}<tr><th scope="row">{{ m.name }}</th><td>{{ m.family or '–' }}</td><td>{{ m.kind }}</td><td>{{ m.lifecycle }}</td><td>{{ 'yes' if m.customer_quotable else 'no' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="small muted">Lifecycle and quotable status can be changed with <code>tsf-sizer set-model</code> inside the container.</p>
+</section>
+{% endif %}
+{% endblock %}

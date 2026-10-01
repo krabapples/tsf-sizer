@@ -218,8 +218,11 @@ def import_workbook(
     activate: bool = False,
     imported_by: str | None = None,
     force: bool = False,
+    filename: str | None = None,
 ) -> ImportReport:
+    """Import a workbook. `filename` is the name to record when `path` is a temp file."""
     wb = read_workbook(path)
+    display_name = filename or wb.path.name
 
     existing = conn.execute(
         "SELECT id, is_active FROM source_document WHERE sha256=? AND sheet_name=?",
@@ -235,10 +238,10 @@ def import_workbook(
             """INSERT INTO source_document (filename, sha256, sheet_name, panos_release,
                                             imported_by)
                VALUES (?, ?, ?, ?, ?)""",
-            (wb.path.name, wb.sha256, wb.sheet_name, wb.release, imported_by),
+            (display_name, wb.sha256, wb.sheet_name, wb.release, imported_by),
         )
         doc_id = cur.lastrowid
-        report = ImportReport(doc_id, wb.path.name, wb.sheet_name, wb.release, activated=False)
+        report = ImportReport(doc_id, display_name, wb.sheet_name, wb.release, activated=False)
         report.warnings.extend(wb.warnings)
 
         # Models. Parents first so components can reference them.

@@ -1,0 +1,164 @@
+from pathlib import Path
+
+import pytest
+from conftest import build_workbook
+
+from tsf_sizer import db
+from tsf_sizer.portfolio.importer import import_workbook
+from tsf_sizer.sizing.engine import Requirement, SizingParams, _check, fit_ports, size, variants
+from tsf_sizer.tsf.metrics import PortUse, summarize
+from tsf_sizer.tsf.techsupport import parse_techsupport
+
+FIXTURE = Path(__file__).parent / "fixtures" / "techsupport_sample.txt"
+
+
+@pytest.fixture
+def sized_db(tmp_path):
+    """Synthetic portfolio where PA-3430 also has 8 copper ports."""
+    path = tmp_path / "Features_Capacities_12_1_2_Engine.xlsx"
+    build_workbook(path, overrides={("Traffic - 10/100/1000", "PA-3430"): 8})
+    conn = db.connect(tmp_path / "e.db")
+    import_workbook(conn, path, activate=True)
+    yield conn
+    conn.close()
+
+
+def summary_as(model: str, ports: list[PortUse] | None = None):
+    facts = parse_techsupport(FIXTURE.read_text())
+    facts.system["model"] = model
+    s = summarize(facts)
+    if ports is not None:
+        s.ports = ports
+    return s
+
+
+def test_variants():
+    assert variants("PA-450R-5G") == {"rugged", "5G"}
+    assert variants("PA-545-POE") == {"PoE"}
+    assert variants("PA-3430") == set()
+
+
+@pytest.mark.parametrize(
+    ("needed", "available", "ok", "missing"),
+    [
+        ({"1G_RJ45": 4}, {"1G_RJ45": 8}, True, []),
+        ({"1G_RJ45": 4}, {"1G_RJ45": 2, "10G_RJ45": 2}, True, []),
+        ({"10G_SFP+": 2}, {"25G_SFP28": 4}, True, []),
+        ({"10G_SFP+": 2}, {"10G_RJ45": 8}, False, ["2x 10G_SFP+"]),
+        ({"1G_SFP": 2, "10G_SFP+": 2}, {"10G_SFP+": 3}, False, ["1x 1G_SFP"]),
+        ({"1G_unknown-media": 2}, {"10G_RJ45": 1, "1G_SFP": 1}, True, []),
+    ],
+)
+def test_fit_ports(needed, available, ok, missing):
+    got_ok, plan, got_missing = fit_ports(needed, available)
+    assert got_ok is ok
+    assert got_missing == missing
+
+
+def test_fit_ports_prefers_smallest_fit():
+    _, plan, _ = fit_ports({"1G_RJ45": 2}, {"10G_RJ45": 4, "1G_RJ45": 2})
+    assert plan["assignment"] == {"1G_RJ45": {"1G_RJ45": 2}}
+    assert plan["spare"] == {"10G_RJ45": 4}
+
+
+def _req(**kw):
+    base = dict(
+        metric="m",
+        label="L",
+        observed=10,
+        observed_basis="count",
+        required=12,
+        current_capacity=20,
+        unit=None,
+        is_perf=False,
+    )
+    return Requirement(**{**base, **kw})
+
+
+def _cap(**kw):
+    base = dict(
+        kind="number", num_value=None, bool_value=None, raw_value=None, special=None, unconfirmed=0
+    )
+    return {**base, **kw}
+
+
+def test_check_rules():
+    assert _check(_req(), _cap(num_value=30, raw_value="30")).status == "pass"
+    below_current = _check(_req(), _cap(num_value=15, raw_value="15"))
+    assert below_current.status == "fail" and "below current model" in below_current.reason
+    too_small = _check(_req(current_capacity=None), _cap(num_value=11, raw_value="11"))
+    assert "needs 12, has 11" in too_small.reason
+    perf_equal = _check(_req(is_perf=True), _cap(num_value=20, raw_value="20"))
+    assert perf_equal.status == "fail" and "not more than current" in perf_equal.reason
+    assert (
+        _check(_req(), _cap(kind="special", special="system_limit", raw_value="System")).status
+        == "pass"
+    )
+    assert (
+        _check(_req(), _cap(kind="special", special="not_applicable", raw_value="-")).status
+        == "fail"
+    )
+    assert (
+        _check(
+            _req(required=0), _cap(kind="special", special="not_applicable", raw_value="-")
+        ).status
+        == "pass"
+    )
+    assert _check(_req(), _cap(kind="bool", bool_value=1, raw_value="Yes")).status == "pass"
+    assert _check(_req(), None).status == "unknown"
+    unconf = _check(_req(), _cap(num_value=30, raw_value="30", unconfirmed=1))
+    assert unconf.unconfirmed is True
+
+
+def test_size_recommends_bigger_model_with_matching_ports(sized_db):
+    s = summary_as("PA-450R")
+    result = size(sized_db, s, SizingParams())
+    assert result.current_in_portfolio
+    assert result.recommended is not None and result.recommended.model == "PA-3430"
+    rej = {c.model: c.failures for c in result.rejected}
+    # Same performance as the current box is not enough.
+    assert any("not more than current" in f for f in rej["PA-450R-5G"])
+    # Chassis without front-panel ports in the sheet cannot take the 8 copper ports.
+    assert any(f.startswith("Ports: missing") for f in rej["PA-7500"])
+    # NPI models are never candidates.
+    assert "PA-540" not in rej and "PA-5550" not in rej
+    assert result.ports_needed["baseline"] == {"1G_RJ45": 8}
+
+
+def test_size_used_port_rule_and_growth(sized_db):
+    s = summary_as(
+        "PA-450R",
+        ports=[
+            PortUse("ethernet1/1", "1G_RJ45", "traffic", "untrust", "1000", "up"),
+            PortUse("ethernet1/2", "1G_RJ45", "traffic", "trust", "1000", "up"),
+        ],
+    )
+    result = size(sized_db, s, SizingParams(port_rule="used", growth_pct_per_year=0, years=1))
+    assert result.ports_needed["baseline"] == {"1G_RJ45": 2}
+    reqs = {r.metric: r for r in result.requirements}
+    assert reqs["config.security_rules"].required == reqs["config.security_rules"].observed
+    thr = reqs["perf.throughput_threat_gbps"]
+    assert thr.required == pytest.approx(2.4 / 0.7, rel=1e-3)  # snapshot / target util
+
+
+def test_size_with_entered_peaks(sized_db):
+    s = summary_as("PA-450R")
+    result = size(sized_db, s, SizingParams(peak_throughput_mbps=20000, growth_pct_per_year=0))
+    reqs = {r.metric: r for r in result.requirements}
+    assert reqs["perf.throughput_threat_gbps"].observed_basis == "entered peak"
+    # 20 Gbps / 0.7 exceeds every quotable model in the synthetic sheet.
+    assert result.recommended is None
+    assert any("No quotable model" in n for n in result.notes)
+
+
+def test_size_unknown_current_model(sized_db):
+    s = summary_as("PA-220")
+    result = size(sized_db, s, SizingParams())
+    assert not result.current_in_portfolio
+    assert any("not in the portfolio" in n for n in result.notes)
+
+
+def test_size_requires_active_portfolio(tmp_path):
+    conn = db.connect(tmp_path / "empty.db")
+    with pytest.raises(LookupError):
+        size(conn, summary_as("PA-3430"))

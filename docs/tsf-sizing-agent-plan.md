@@ -61,7 +61,7 @@ The whole tool ships as **one Docker image**. A colleague runs it with a single 
 | Part | Choice | Why |
 |---|---|---|
 | Backend | Python 3.12 + FastAPI | TSF parsing, XML and spreadsheets are easiest in Python; FastAPI gives a clean JSON API and auto docs |
-| Frontend | React + Vite + Tailwind, built to static files and served by FastAPI | Interactive result page and chat; one origin, no extra web server. *(Simpler option: server-rendered Jinja + HTMX, with no Node build step.)* |
+| Frontend | Server-rendered Jinja2 templates + plain CSS, served by FastAPI (built) | No Node build step, no external CDNs, works offline; React can be added later for the chat/what-if UI |
 | Spreadsheet | `openpyxl` / `pandas` | Reads the team's .xlsx directly |
 | LLM | Anthropic Python SDK (Claude) | Tool use for the what-if agent; the endpoint is configurable via env vars |
 | Storage | SQLite on a mounted volume | No database server; survives container restarts |

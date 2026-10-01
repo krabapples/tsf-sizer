@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Analyses · TSF Sizer{% endblock %}
+{% block content %}
+<h1>Size a replacement firewall</h1>
+
+{% if not portfolio %}
+<div class="callout callout-warn" role="alert">
+  <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
+  <div><strong>No portfolio loaded.</strong> Import the Features &amp; Capacities workbook on the <a href="/portfolio">Portfolio page</a> first; without it the report can't recommend a model.</div>
+</div>
+{% else %}
+<p class="muted">Portfolio: {{ portfolio.filename }} · PAN-OS {{ portfolio.panos_release }} · imported {{ portfolio.imported_at }}</p>
+{% endif %}
+
+<section class="card" aria-labelledby="upload-h">
+  <h2 id="upload-h">New analysis</h2>
+  <form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form">
+    <div class="grid-2">
+      <div class="field">
+        <label for="tsf">Tech Support File <span class="req">required</span></label>
+        <input id="tsf" name="tsf" type="file" required accept=".tgz,.gz,.tar,.txt">
+        <p class="hint">The TSF as exported from the firewall (.tgz, up to {{ max_mb }} MB), or the <code>techsupport_*.txt</code> from inside it. Only a few files are read; the upload is deleted after processing.</p>
+      </div>
+      <div class="field">
+        <label for="config">Config XML <span class="opt">optional</span></label>
+        <input id="config" name="config" type="file" accept=".xml">
+        <p class="hint">Only needed when you upload the .txt alone. Use <code>.merged-running-config.xml</code> for Panorama-managed firewalls.</p>
+      </div>
+      <div class="field">
+        <label for="customer">Customer / opportunity <span class="opt">optional</span></label>
+        <input id="customer" name="customer" type="text" maxlength="200" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="port_rule">Port rule</label>
+        <select id="port_rule" name="port_rule">
+          <option value="all" selected>At least the current model's full port layout</option>
+          <option value="used">Only the ports in use</option>
+        </select>
+      </div>
+    </div>
+
+    <details class="advanced">
+      <summary>Sizing assumptions and known peaks</summary>
+      <div class="grid-3">
+        <div class="field">
+          <label for="growth_pct">Growth per year (%)</label>
+          <input id="growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}">
+        </div>
+        <div class="field">
+          <label for="years">Planning horizon (years)</label>
+          <input id="years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}">
+        </div>
+        <div class="field">
+          <label for="target_util_pct">Target utilization (%)</label>
+          <input id="target_util_pct" name="target_util_pct" type="number" min="10" max="100" step="5" value="{{ defaults.target_util_pct|int }}">
+          <p class="hint">Performance is sized so the peak stays below this.</p>
+        </div>
+        <div class="field">
+          <label for="peak_throughput_mbps">Known peak throughput (Mbps)</label>
+          <input id="peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring">
+          <p class="hint">The TSF only has a snapshot; a known peak gives a far better result.</p>
+        </div>
+        <div class="field">
+          <label for="peak_cps">Known peak connections/s</label>
+          <input id="peak_cps" name="peak_cps" type="text" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="peak_sessions">Known peak sessions</label>
+          <input id="peak_sessions" name="peak_sessions" type="text" inputmode="numeric">
+        </div>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        <span>Upload and analyze</span>
+      </button>
+      <span class="muted" id="upload-status" aria-live="polite"></span>
+    </div>
+  </form>
+</section>
+
+<section aria-labelledby="hist-h">
+  <h2 id="hist-h">Recent analyses</h2>
+  {% if history %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th scope="col">#</th><th scope="col">Date (UTC)</th><th scope="col">Customer</th><th scope="col">File</th><th scope="col">Current</th><th scope="col">Recommended</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr>
+        <td><a href="/analyses/{{ h.id }}">{{ h.id }}</a></td>
+        <td class="nowrap">{{ h.created_at }}</td>
+        <td>{{ h.customer or '–' }}</td>
+        <td class="truncate" title="{{ h.filename }}">{{ h.filename }}</td>
+        <td>{{ h.model or '–' }}</td>
+        <td>{% if h.recommended %}<strong>{{ h.recommended }}</strong>{% else %}–{% endif %}</td>
+        <td><span class="badge badge-{{ h.status }}">{{ h.status }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">No analyses yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById('upload-form').addEventListener('submit', function () {
+    var b = document.getElementById('submit-btn');
+    b.disabled = true;
+    b.querySelector('span').textContent = 'Uploading…';
+    document.getElementById('upload-status').textContent = 'Large TSFs can take a minute to upload.';
+  });
+</script>
+{% endblock %}

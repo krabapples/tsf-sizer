@@ -1,0 +1,24 @@
+services:
+  tsf-sizer:
+    build: .
+    image: tsf-sizer:latest
+    container_name: tsf-sizer
+    ports:
+      # Local use: only reachable from this machine. For a shared server put a
+      # reverse proxy with HTTPS in front and change this to "8080:8080".
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - tsf-sizer-data:/data
+    environment:
+      # Optional login (HTTP basic auth). Set both to enable it.
+      TSF_SIZER_USER: ${TSF_SIZER_USER:-}
+      TSF_SIZER_PASSWORD: ${TSF_SIZER_PASSWORD:-}
+      TSF_SIZER_MAX_UPLOAD_MB: ${TSF_SIZER_MAX_UPLOAD_MB:-1024}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  tsf-sizer-data:

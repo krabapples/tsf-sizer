@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error · TSF Sizer{% endblock %}
+{% block content %}
+<h1>{{ 'Not found' if status == 404 else 'Something went wrong' }}</h1>
+<div class="callout callout-error" role="alert">
+  <svg aria-hidden="true" class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+  <div><p>{{ detail }}</p><p><a href="/">Back to analyses</a></p></div>
+</div>
+{% endblock %}

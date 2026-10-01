@@ -5,10 +5,15 @@ description = "Firewall replacement sizing from PAN-OS Tech Support Files"
 requires-python = ">=3.11"
 dependencies = [
     "openpyxl>=3.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "httpx>=0.27",
     "pytest>=8",
     "ruff>=0.5",
 ]
@@ -23,6 +28,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["tsf_sizer*"]
 
+[tool.setuptools.package-data]
+"tsf_sizer.web" = ["templates/*.html", "static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -36,3 +44,7 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # One mapping per line reads better than wrapped tuples.
 "tsf_sizer/portfolio/mapping.py" = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI declares request parameters with File()/Form() defaults by design.
+extend-immutable-calls = ["fastapi.File", "fastapi.Form"]

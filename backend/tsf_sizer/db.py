@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS tsf_metric_map (
     PRIMARY KEY (document_id, tsf_metric)
 );
 
+-- One row per uploaded TSF analysis (the web app's history).
+CREATE TABLE IF NOT EXISTS analysis (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at  TEXT,
+    customer     TEXT,
+    filename     TEXT NOT NULL,
+    status       TEXT NOT NULL,            -- queued | running | done | error
+    error        TEXT,
+    params_json  TEXT NOT NULL,
+    result_json  TEXT,
+    created_by   TEXT
+);
+
 -- Effective model metadata: workbook-derived values with team overrides on top.
 CREATE VIEW IF NOT EXISTS model_effective AS
 SELECT

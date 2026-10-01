@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TSF Sizer{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>TSF Sizer</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>Analyses</a>
+      <a href="/portfolio" {% if request.url.path.startswith('/portfolio') %}aria-current="page"{% endif %}>Portfolio</a>
+    </nav>
+  </header>
+  <main id="main" class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer container">
+    Internal presales tool · Contains customer data, handle as confidential · Recommendations are a draft for engineer review.
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
