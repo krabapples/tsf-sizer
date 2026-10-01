@@ -58,6 +58,7 @@ Defaults can be changed per analysis under *Sizing assumptions and known peaks*.
 - Features in use (HA mode, GTP, SCTP, …) must be supported.
 - Unreleased (NPI) models and chassis cards are never recommended.
 - **Previous generations** (e.g. PA-400, succeeded by PA-500) are left out unless *Include previous-generation models* is ticked on the analysis form.
+- **PoE:** dedicated PoE models (e.g. PA-545-POE, PA-555-POE) are only recommended when *Customer needs PoE* is ticked; then only models with PoE ports qualify (which includes models with PoE as standard, like the PA-1400 series). It switches on automatically when the TSF shows PoE devices powered on the current firewall.
 - **No oversizing:** models with more than 5× the current model's throughput (or 5× the requirement, if that is higher) are listed as "too large" instead of recommended. Change the factor under *Sizing assumptions*.
 
 ### Family settings (Portfolio page)

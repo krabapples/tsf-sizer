@@ -92,6 +92,7 @@ class TsfSummary:
     licenses_active: list[str]
     licenses_expired: list[str]
     sizing_basis: str
+    poe: dict = field(default_factory=dict)
     config_source: str | None = None
     panorama_managed: bool | None = None
     metrics: dict[str, Metric] = field(default_factory=dict)
@@ -165,6 +166,7 @@ def summarize(
         licenses_expired=lic_expired,
         sizing_basis="threat_prevention" if threat else "app_id",
     )
+    s.poe = f.poe
     m = s.metrics
 
     # ---- performance
@@ -349,6 +351,14 @@ def summarize(
         )
     _m(m, "feature.gtp", bool(sess.get("sessions_gtpu")), SNAPSHOT, "show session info")
     _m(m, "feature.sctp", bool(sess.get("sessions_sctp")), SNAPSHOT, "show session info")
+    if f.poe.get("supported") is not None:
+        _m(
+            m,
+            "state.poe_ports_in_use",
+            len(f.poe.get("ports_in_use", [])),
+            SNAPSHOT,
+            "show poe detail",
+        )
     _m(
         m,
         "feature.lre_routing",
@@ -438,6 +448,11 @@ def _warnings(f: TechSupportFacts, s: TsfSummary, uptime_s: int | None) -> list[
     if f.ha.get("enabled") and any(p.role == "ha" for p in s.ports):
         w.append(
             "HA links use data ports on this model; a target with dedicated HA ports frees them up."
+        )
+    if f.poe.get("supported") and not f.poe.get("parsed"):
+        w.append(
+            "The firewall supports PoE but the PoE status could not be read from the TSF: "
+            "tick 'Customer needs PoE' if PoE devices are connected."
         )
     if f.missing_commands:
         w.append("Missing from techsupport file: " + ", ".join(f.missing_commands))

@@ -41,6 +41,7 @@
     <span class="chip chip-glass">{{ icon('layers', 'icon-sm') }}{{ h.ha }}</span>
     <span class="chip chip-glass">{{ icon('code', 'icon-sm') }}{{ h.config_source or 'no config' }}{% if h.panorama %} · Panorama-managed{% endif %}</span>
     <span class="chip chip-glass">{{ icon('gauge', 'icon-sm') }}Sized on {{ h.basis }} throughput</span>
+    {% if v.need_poe %}<span class="chip chip-glass">{{ icon('plug', 'icon-sm') }}PoE needed{% if v.poe.ports_in_use %} · in use on {{ v.poe.ports_in_use|length }} port(s){% endif %}</span>{% endif %}
   </div>
 </section>
 
@@ -80,6 +81,7 @@
       </div>
       <dl class="kv">
         <dt>Ports</dt><dd>{{ c.ports }}</dd>
+        {% if v.need_poe or c.poe_ports %}<dt>PoE ports</dt><dd>{{ c.poe_ports or 'none' }}</dd>{% endif %}
       </dl>
       {% if c.tightest or c.unconfirmed or c.unknown_features or c.too_large %}
       <div class="rec-notes">
@@ -100,6 +102,7 @@
       performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model;
       object, rule and interface counts at least the current model's (per-item limits such as members per address group only need to cover usage);
       ports: {{ v.port_rule }}; features in use supported;
+      {% if v.need_poe %}PoE needed: only models with PoE ports;{% else %}PoE not needed: dedicated PoE models left out;{% endif %}
       {% if v.size_cap %}at most {{ v.params.max_size_factor|num }}× the current performance ({{ v.size_cap|num }} Gbps);{% endif %}
       {% if v.excluded_families %}previous generations left out ({% for fam, succ in v.excluded_families.items() %}{{ fam }} → {{ succ }}{% if not loop.last %}, {% endif %}{% endfor %});{% elif v.params.include_superseded %}previous generations included;{% endif %}
       unreleased (NPI) models excluded.

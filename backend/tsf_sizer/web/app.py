@@ -164,6 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         peak_sessions: str = Form(""),
         port_rule: str = Form("all"),
         include_superseded: str = Form(""),
+        need_poe: str = Form(""),
         max_size_factor: float = Form(5.0),
     ):
         def opt(v: str) -> float | None:
@@ -191,6 +192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             peak_sessions=opt(peak_sessions),
             port_rule="used" if port_rule == "used" else "all",
             include_superseded=bool(include_superseded),
+            need_poe=bool(need_poe),
             max_size_factor=max_size_factor,
         )
         tsf_path = await save_upload(tsf, ".tsf")

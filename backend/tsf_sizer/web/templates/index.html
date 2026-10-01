@@ -78,6 +78,14 @@
       </label>
       {% endif %}
 
+      <label class="switch-row" for="need_poe">
+        <span class="text">
+          <strong>Customer needs PoE</strong>
+          <span class="hint">Off: dedicated PoE models (e.g. PA-545-POE) are not recommended. On: only models with PoE ports qualify. Switched on automatically when the current firewall powers PoE devices.</span>
+        </span>
+        <span class="switch"><input id="need_poe" name="need_poe" type="checkbox" value="1" role="switch"><span class="track"></span></span>
+      </label>
+
       <details class="disclosure">
         <summary><span>Sizing assumptions and known peaks</span>{{ icon('chevron-down', 'icon chev') }}</summary>
         <div class="body grid-2" style="gap:14px">

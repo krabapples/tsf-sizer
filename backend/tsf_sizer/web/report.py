@@ -174,6 +174,7 @@ def build(result: dict, row: dict) -> dict:
                 "variants": cand.get("extra_variants", []),
                 "unknown_features": cand.get("unknown_features", []),
                 "too_large": cand.get("too_large"),
+                "poe_ports": cand.get("poe_ports", 0),
             }
         )
 
@@ -253,6 +254,8 @@ def build(result: dict, row: dict) -> dict:
         "req_rows": req_rows,
         "rejected": rejected,
         "size_cap": sizing.get("size_cap_gbps"),
+        "need_poe": sizing.get("need_poe"),
+        "poe": s.get("poe") or {},
         "excluded_families": sizing.get("excluded_families") or {},
         "history": history,
         "warnings": warnings,

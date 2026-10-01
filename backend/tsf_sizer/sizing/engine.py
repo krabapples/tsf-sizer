@@ -79,6 +79,9 @@ class SizingParams:
     include_npi: bool = False
     # Previous-generation families (family_setting.superseded_by) are left out unless included.
     include_superseded: bool = False
+    # PoE: dedicated PoE models (-POE) are only recommended when PoE is needed; when it is,
+    # only models with PoE ports qualify. PoE in use on the current firewall forces it on.
+    need_poe: bool = False
     # A candidate may offer at most this many times the performance of the current model
     # (or of the requirement, if higher). 0 disables the cap.
     max_size_factor: float = 5.0
@@ -126,6 +129,7 @@ class Candidate:
     tightest: list[str] = field(default_factory=list)
     unconfirmed_used: list[str] = field(default_factory=list)
     extra_variants: list[str] = field(default_factory=list)
+    poe_ports: int = 0
     too_large: str | None = None
     unknown_features: list[str] = field(default_factory=list)
     sort_key: float = 0.0
@@ -145,6 +149,7 @@ class SizingResult:
     too_large: list[Candidate] = field(default_factory=list)
     excluded_families: dict = field(default_factory=dict)
     size_cap_gbps: float | None = None
+    need_poe: bool = False
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -399,6 +404,16 @@ def fit_ports(needed: dict[str, int], available: dict[str, int]) -> tuple[bool, 
 # --------------------------------------------------------------------------- engine
 
 
+def _poe_ports(conn, model: str, doc_id: int) -> int:
+    row = conn.execute(
+        """SELECT v.num_value FROM capacity_value v
+           JOIN attribute a ON a.id = v.attribute_id JOIN model m ON m.id = v.model_id
+           WHERE v.document_id=? AND m.name=? AND a.canonical_key=?""",
+        (doc_id, model, "interfaces.poe_enabled_interfaces"),
+    ).fetchone()
+    return int(row[0]) if row and row[0] else 0
+
+
 def _ha_dedicated(conn, model: str, doc_id: int) -> bool:
     row = conn.execute(
         """SELECT count(*) FROM capacity_value v
@@ -469,6 +484,14 @@ def size(
         for k, v in summary.metrics.items()
         if k.startswith("feature.") and v.value is True
     }
+    poe_ports_used = (summary.poe or {}).get("ports_in_use", [])
+    need_poe = params.need_poe or bool(poe_ports_used)
+    result.need_poe = need_poe
+    if poe_ports_used and not params.need_poe:
+        result.notes.append(
+            f"PoE is in use on the current firewall ({', '.join(poe_ports_used)}): only models "
+            "with PoE ports are considered."
+        )
 
     superseded = catalog.superseded_families(conn)
     thr_req = next((r for r in reqs if r.metric.startswith("perf.throughput")), None)
@@ -508,6 +531,13 @@ def size(
             if not (cap.get("bool_value") == 1 or (cap.get("num_value") or 0) > 0):
                 cand.failures.append(f"{cap['name']}: not supported")
 
+        poe_ports = _poe_ports(conn, model["name"], document_id)
+        if need_poe and not poe_ports:
+            cand.failures.append("PoE: no PoE ports")
+        elif not need_poe and "PoE" in variants(model["name"]):
+            cand.failures.append("PoE model: PoE not needed (tick 'Customer needs PoE' to include)")
+        cand.poe_ports = poe_ports
+
         # Ports: baseline + HA links when the candidate has no dedicated HA ports
         avail = catalog.interface_ports(conn, model["name"], document_id)
         need = dict(base_ports)
@@ -535,7 +565,9 @@ def size(
             None,
         )
         cand.sort_key = thr if thr is not None else float("inf")
-        cand.extra_variants = sorted(variants(model["name"]) - variants(current or ""))
+        cand.extra_variants = sorted(
+            variants(model["name"]) - variants(current or "") - ({"PoE"} if need_poe else set())
+        )
         if size_cap is not None and thr is not None and thr > size_cap:
             cand.too_large = (
                 f"{_fmt(thr)} Gbps is more than {params.max_size_factor:g}x the current "

@@ -182,11 +182,13 @@ def test_switch_and_size_cap_reach_the_engine(client):
     page = client.get("/")
     assert "Include previous-generation models" in page.text
     assert "PA-400 series, succeeded by PA-500" in page.text
-    r = upload(client, include_superseded="1", max_size_factor="3")
+    assert "Customer needs PoE" in page.text
+    r = upload(client, include_superseded="1", max_size_factor="3", need_poe="1")
     analysis_id = int(r.headers["location"].rsplit("/", 1)[1])
     assert wait_done(client, analysis_id)["status"] == "done"
     params = client.get(f"/analyses/{analysis_id}/report.json").json()["sizing"]["params"]
     assert params["include_superseded"] is True and params["max_size_factor"] == 3
+    assert params["need_poe"] is True
     assert upload(client, max_size_factor="1").status_code == 400
 
 

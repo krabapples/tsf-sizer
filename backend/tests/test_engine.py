@@ -220,3 +220,49 @@ def test_size_requires_active_portfolio(tmp_path):
     conn = db.connect(tmp_path / "empty.db")
     with pytest.raises(LookupError):
         size(conn, summary_as("PA-3430"))
+
+
+def _give_poe(conn, model: str, ports: int) -> None:
+    """The synthetic sheet has no PoE row: add one for a model."""
+    conn.execute(
+        "INSERT OR IGNORE INTO attribute (canonical_key, category, name, value_type) "
+        "VALUES ('interfaces.poe_enabled_interfaces', 'Interfaces', 'PoE Enabled Interfaces', "
+        "'number')"
+    )
+    attr = conn.execute(
+        "SELECT id FROM attribute WHERE canonical_key='interfaces.poe_enabled_interfaces'"
+    ).fetchone()[0]
+    mid = conn.execute("SELECT id FROM model WHERE name=?", (model,)).fetchone()[0]
+    conn.execute(
+        "INSERT INTO capacity_value (document_id, model_id, attribute_id, raw_value, kind, "
+        "num_value) VALUES (1, ?, ?, ?, 'number', ?)",
+        (mid, attr, str(ports), ports),
+    )
+    conn.commit()
+
+
+def test_poe_needed_requires_poe_ports(sized_db):
+    s = summary_as("PA-450R")
+    base = SizingParams(include_superseded=True, max_size_factor=0)
+    off = size(sized_db, s, base)
+    assert off.recommended.model == "PA-3430" and off.need_poe is False
+    on = size(sized_db, s, SizingParams(**{**base.__dict__, "need_poe": True}))
+    assert on.recommended is None
+    assert any("PoE: no PoE ports" in f for c in on.rejected for f in c.failures)
+    _give_poe(sized_db, "PA-3430", 4)
+    on = size(sized_db, s, SizingParams(**{**base.__dict__, "need_poe": True}))
+    assert on.recommended.model == "PA-3430" and on.recommended.poe_ports == 4
+
+
+def test_poe_in_use_forces_poe(sized_db):
+    s = summary_as("PA-450R")
+    s.poe = {"supported": True, "ports_in_use": ["ethernet1/3"], "parsed": True}
+    r = size(sized_db, s, SizingParams(include_superseded=True, max_size_factor=0))
+    assert r.need_poe is True
+    assert any("PoE is in use on the current firewall" in n for n in r.notes)
+
+
+def test_dedicated_poe_models_left_out_unless_needed():
+    from tsf_sizer.sizing.engine import variants
+
+    assert "PoE" in variants("PA-545-POE") and "PoE" not in variants("PA-1410")

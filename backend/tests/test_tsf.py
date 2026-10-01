@@ -277,3 +277,38 @@ def test_real_techsupport():
     assert f.missing_commands == []
     assert "perf.dp_cpu_peak_pct" in s.metrics
     assert any(p.role == "traffic" for p in s.ports)
+
+
+@pytest.mark.parametrize(
+    ("body", "supported", "in_use"),
+    [
+        (None, None, []),
+        ("This platform does not support PoE", False, []),
+        (
+            "Name          Enabled  Class  Allocated  Consumed\n"
+            "ethernet1/5   yes      4      30.0W      12.5W\n"
+            "ethernet1/6   yes      0      0.0W       0.0W\n"
+            "ethernet1/7   no       -      0.0W       0.0W\n",
+            True,
+            ["ethernet1/5"],
+        ),
+        (
+            "ethernet1/9   PoE enabled, delivering power\nethernet1/10  disabled\n",
+            True,
+            ["ethernet1/9"],
+        ),
+    ],
+)
+def test_parse_poe(body, supported, in_use):
+    from tsf_sizer.tsf.techsupport import parse_poe
+
+    poe = parse_poe(body)
+    assert poe["supported"] is supported
+    assert poe["ports_in_use"] == in_use
+
+
+def test_poe_in_use_becomes_a_metric(text):
+    extra = "\n> show poe detail\n\nethernet1/2   yes   4   30.0W   15.0W\n\n"
+    s = summarize(parse_techsupport(text + extra))
+    assert s.metrics["state.poe_ports_in_use"].value == 1
+    assert s.poe["ports_in_use"] == ["ethernet1/2"]

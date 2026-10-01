@@ -323,6 +323,30 @@ def parse_licenses(body: str) -> list[dict]:
     return out
 
 
+_POE_PORT = re.compile(r"^\s*(ethernet\d+/\d+)\b(.*)$", re.I | re.M)
+_POE_ON = re.compile(r"\b(delivering|powered|power[- ]?on|on|yes|enabled)\b", re.I)
+_POE_WATTS = re.compile(r"(\d+(?:\.\d+)?)\s*(m?W)\b")
+
+
+def parse_poe(body: str | None) -> dict:
+    """PoE status from `show poe detail`.
+
+    Returns supported (True/False/None when unknown) and the ports that look like
+    they deliver power (enabled and/or drawing more than 0 W).
+    """
+    if body is None:
+        return {"supported": None, "ports_in_use": [], "parsed": False}
+    if re.search(r"does not support poe|poe (is )?not supported", body, re.I):
+        return {"supported": False, "ports_in_use": [], "parsed": True}
+    in_use = []
+    lines = _POE_PORT.findall(body)
+    for name, rest in lines:
+        watts = [float(v) / (1000 if u.lower() == "mw" else 1) for v, u in _POE_WATTS.findall(rest)]
+        if (watts and max(watts) > 0) or (not watts and _POE_ON.search(rest)):
+            in_use.append(name)
+    return {"supported": True, "ports_in_use": sorted(set(in_use)), "parsed": bool(lines)}
+
+
 _RULE = re.compile(r'^"(.+); index: \d+" \{', re.M)
 
 
@@ -393,6 +417,7 @@ class TechSupportFacts:
     nat_types: dict = field(default_factory=dict)
     network: dict = field(default_factory=dict)
     counters_of_interest: dict = field(default_factory=dict)
+    poe: dict = field(default_factory=dict)
     missing_commands: list = field(default_factory=list)
 
 
@@ -437,6 +462,7 @@ def parse_techsupport(text: str) -> TechSupportFacts:
                     details[hw["name"]] = parse_interface_detail(d)
         f.interfaces["details"] = details
     f.ha = parse_ha(ts.get("show high-availability all") or "")
+    f.poe = parse_poe(ts.get("show poe detail"))
     if b := need("request license info"):
         f.licenses = parse_licenses(b)
 
