@@ -75,11 +75,11 @@ The whole tool ships as **one Docker image**. A colleague runs it with a single 
 docker pull <registry>/tsf-sizer:latest        # or: docker build -t tsf-sizer .
 
 # run
-docker run -d --name tsf-sizer -p 8080:8080 \
+docker run -d --name tsf-sizer -p 8088:8088 \
   -e ANTHROPIC_API_KEY=... \
   -v tsf-sizer-data:/data \
   <registry>/tsf-sizer:latest
-# → open http://localhost:8080
+# → open http://localhost:8088
 ```
 A `docker-compose.yml` ships as well, with the same settings and an optional reverse proxy (Caddy/Traefik) for HTTPS when hosted centrally.
 

@@ -11,7 +11,7 @@ git clone <this repo> tsf-sizer && cd tsf-sizer
 docker compose up -d --build
 ```
 
-Open <http://localhost:8080>.
+Open <http://localhost:8088>.
 
 **First time only:** go to **Portfolio**, import the *Features & Capacities* workbook (.xlsx), check the import report, and click **Activate**. The workbook is internal, so it is never part of the repo or the image; it lives in the container's data volume.
 
@@ -25,8 +25,9 @@ Stop with `docker compose down`. Analyses and the portfolio survive restarts (Do
 |---|---|---|
 | `TSF_SIZER_USER`, `TSF_SIZER_PASSWORD` | not set | Require a login (HTTP basic auth). Set both. |
 | `TSF_SIZER_MAX_UPLOAD_MB` | `1024` | Upload limit per file |
+| `TSF_SIZER_PORT` | `8088` | Port on your machine (if 8088 is taken too) |
 
-By default the app is only reachable from your own machine (`127.0.0.1:8080`). For a shared team server, put a reverse proxy with HTTPS in front of it, set a login, and change the port mapping in `docker-compose.yml`.
+By default the app is only reachable from your own machine (`127.0.0.1:8088`). For a shared team server, put a reverse proxy with HTTPS in front of it, set a login, and change the port mapping in `docker-compose.yml`.
 
 ### Building behind a TLS-inspecting proxy
 
@@ -72,6 +73,6 @@ See [backend/README.md](backend/README.md) for the command-line tools and tests,
 
 ```bash
 cd backend && pip install -e ".[dev]"
-uvicorn --factory tsf_sizer.web.app:create_app --reload --port 8080
+uvicorn --factory tsf_sizer.web.app:create_app --reload --port 8088
 pytest && ruff check .
 ```

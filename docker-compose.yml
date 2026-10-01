@@ -4,9 +4,10 @@ services:
     image: tsf-sizer:latest
     container_name: tsf-sizer
     ports:
-      # Local use: only reachable from this machine. For a shared server put a
-      # reverse proxy with HTTPS in front and change this to "8080:8080".
-      - "127.0.0.1:8080:8080"
+      # Local use: only reachable from this machine. Change the host port with
+      # TSF_SIZER_PORT (e.g. in .env). For a shared server put a reverse proxy
+      # with HTTPS in front and drop the "127.0.0.1:" prefix.
+      - "127.0.0.1:${TSF_SIZER_PORT:-8088}:8088"
     volumes:
       - tsf-sizer-data:/data
     environment:
