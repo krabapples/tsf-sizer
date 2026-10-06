@@ -256,3 +256,31 @@ def test_real_workbook_imports_cleanly(conn):
     assert report.models["quotable"]
     unparsed = report.needs_review_total / report.cell_count
     assert unparsed < 0.01
+
+
+def test_renamed_performance_rows_still_map(conn, workbook, tmp_path):
+    """A newer workbook overwrote the 'Performance' header and renamed the CPS row."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(workbook)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value == "Performance":
+                    cell.value = "requires update"
+                elif cell.value == "Connections per second":
+                    cell.value = "New Sessions Per Second"
+    changed = tmp_path / "Capacity_Workbook_Renamed.xlsx"
+    wb.save(changed)
+    report = import_workbook(conn, changed)
+    unresolved = " ".join(report.tsf_map_unresolved)
+    for metric in ("perf.throughput_threat_gbps", "perf.throughput_ipsec_gbps", "perf.cps"):
+        assert metric not in unresolved
+    assert any("matched by name" in w for w in report.warnings)
+    row = conn.execute(
+        """SELECT v.raw_value FROM tsf_metric_map t
+           JOIN capacity_value v ON v.attribute_id = t.attribute_id
+           JOIN model m ON m.id = v.model_id
+           WHERE t.tsf_metric='perf.cps' AND m.name='PA-3430'"""
+    ).fetchone()
+    assert row is not None

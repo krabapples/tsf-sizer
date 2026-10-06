@@ -10,8 +10,10 @@ from pathlib import Path
 
 from . import values as V
 from .mapping import (
+    ALIASES,
     INTERFACE_ROW_PREFIX,
     INTERFACE_ROWS,
+    PERFORMANCE_CATEGORIES,
     TSF_METRIC_MAP,
     is_throughput_row,
     norm,
@@ -422,8 +424,23 @@ def _import_interfaces(conn, doc_id, rows, specs, model_ids, report: ImportRepor
 
 
 def _import_tsf_map(conn, doc_id, attr_by_name, report: ImportReport) -> None:
+    by_name: dict[str, list[int]] = {}
+    for (_cat, attr_name), attr_id in attr_by_name.items():
+        by_name.setdefault(attr_name, []).append(attr_id)
+    by_name_hit = False
     for metric, category, name, compare_as in TSF_METRIC_MAP:
-        attr_id = attr_by_name.get((norm(category), norm(name)))
+        attr_id = None
+        for cat, nm in [(category, name), *ALIASES.get(metric, [])]:
+            attr_id = attr_by_name.get((norm(cat), norm(nm)))
+            if attr_id is None and norm(cat) in PERFORMANCE_CATEGORIES:
+                # Same row under another section header: accept a unique match on the name.
+                hits = by_name.get(norm(nm), [])
+                attr_id = hits[0] if len(hits) == 1 else None
+                if attr_id is not None and not by_name_hit:
+                    by_name_hit = True
+
+            if attr_id is not None:
+                break
         if attr_id is None:
             report.tsf_map_unresolved.append(f"{metric} -> {category} / {name}")
             continue
@@ -433,6 +450,11 @@ def _import_tsf_map(conn, doc_id, attr_by_name, report: ImportReport) -> None:
             (doc_id, metric, attr_id, compare_as),
         )
         report.tsf_map_resolved += 1
+    if by_name_hit:
+        report.warnings.append(
+            "Some performance rows are not under a 'Performance' section header in this "
+            "workbook (the header may have been overwritten); they were matched by name."
+        )
 
 
 def _snapshot(conn, doc_id) -> dict[tuple[str, str], tuple]:

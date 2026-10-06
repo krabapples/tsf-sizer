@@ -177,6 +177,16 @@ INTERFACE_ROWS: dict[str, str] = {
 INTERFACE_ROW_PREFIX = "Traffic - "
 
 
+# Other names a row has had in newer workbooks (matched after the primary name).
+ALIASES: dict[str, list[tuple[str, str]]] = {
+    "perf.cps": [("Performance", "New Sessions Per Second")],
+}
+
+# Section headers that stand in for "Performance" in some workbook versions (e.g. the header
+# cell was overwritten by a "requires update" marker).
+PERFORMANCE_CATEGORIES = {"performance", "requires update"}
+
+
 def norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
@@ -186,4 +196,6 @@ def slug(s: str) -> str:
 
 
 def is_throughput_row(category: str, name: str) -> bool:
-    return norm(category) == "performance" and bool(re.search(r"throughput|gbps|64k", name, re.I))
+    return norm(category) in PERFORMANCE_CATEGORIES and bool(
+        re.search(r"throughput|gbps|64k", name, re.I)
+    )

@@ -501,7 +501,12 @@ def size(
         if thr_req.current_capacity:
             size_cap = round(base * params.max_size_factor, 3)
         else:
-            result.notes.append("Size cap not applied: the current model's throughput is unknown.")
+            result.notes.append(
+                "WARNING: the portfolio workbook has no throughput for the current model "
+                f"({current}), so performance is not checked and the size cap is not applied. "
+                "The import report on the Portfolio page lists the unresolved rows; fix the "
+                "workbook or mapping and re-run before trusting this recommendation."
+            )
     result.size_cap_gbps = size_cap
 
     candidates = []
