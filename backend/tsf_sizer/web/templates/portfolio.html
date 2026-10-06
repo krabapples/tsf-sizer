@@ -16,6 +16,16 @@
 </div>
 {% endif %}
 
+{% if missing_perf %}
+<div class="callout callout-error" role="alert">
+  {{ icon('x-circle') }}
+  <div>
+    <strong>The active version has no performance data for the sizing.</strong>
+    <p>Missing: {{ missing_perf|join(', ') }}. Without it throughput and connections per second are not checked and no size cap applies, so recommendations can be far too large. Import the workbook again with <em>Re-import</em> switched on and activate the new version.</p>
+  </div>
+</div>
+{% endif %}
+
 <div class="split">
   <section class="card stack reveal" aria-labelledby="imp-h">
     <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('upload') }}</span><div><h2 id="imp-h">Import a workbook</h2><p class="muted small">A new import is only used after you activate it. The file itself is not kept.</p></div></div>

@@ -395,6 +395,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             docs = catalog.list_documents(c)
             models = catalog.list_models(c)
             families = catalog.list_families(c)
+            # Performance values the sizing needs but the active import has no mapping for
+            # (e.g. imported before the app learned a workbook's new layout).
+            missing_perf = []
+            for d in docs:
+                if d["is_active"]:
+                    mapped = {
+                        r[0]
+                        for r in c.execute(
+                            "SELECT tsf_metric FROM tsf_metric_map WHERE document_id=?", (d["id"],)
+                        )
+                    }
+                    missing_perf = [
+                        m for m in ("perf.throughput_threat_gbps", "perf.cps") if m not in mapped
+                    ]
             report = None
             if imported:
                 r = c.execute(
@@ -411,6 +425,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             report=report,
             imported=imported,
             msg=msg,
+            missing_perf=missing_perf,
         )
 
     @app.post("/portfolio")
@@ -427,7 +442,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
         except AlreadyImportedError as e:
             return RedirectResponse(
-                f"/portfolio?msg=Already imported as document {e.document_id}", status_code=303
+                f"/portfolio?msg=Already imported as document {e.document_id}. "
+                "Switch on Re-import to import it again (needed after an app update).",
+                status_code=303,
             )
         except Exception as e:  # noqa: BLE001 - show any workbook problem to the admin
             return RedirectResponse(

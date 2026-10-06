@@ -218,3 +218,15 @@ def test_family_settings_page(client):
     assert (
         client.post("/portfolio/families/PA-9", data={}, follow_redirects=False).status_code == 404
     )
+
+
+def test_portfolio_warns_when_performance_mapping_is_missing(client):
+    assert "no performance data" not in client.get("/portfolio").text
+    from tsf_sizer import db
+
+    conn = db.connect(client.app_state.state.settings.db_path)
+    with conn:
+        conn.execute("DELETE FROM tsf_metric_map WHERE tsf_metric='perf.cps'")
+    conn.close()
+    page = client.get("/portfolio").text
+    assert "no performance data" in page and "perf.cps" in page
