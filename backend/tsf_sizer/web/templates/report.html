@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set h = v.header %}
+{% set rec = v.cards[0] if v.cards else None %}
+{% block title %}{{ h.model }}{% if rec %} → {{ rec.model }}{% endif %}{% if v.customer %} · {{ v.customer }}{% endif %} · TSF Sizer{% endblock %}
+
+{% macro meter(pct, level, label) -%}
+<div class="meter" role="img" aria-label="{{ label }}: {{ pct|pct }} of capacity">
+  <div class="meter-track"><div class="meter-fill meter-{{ level }}" style="width: {{ pct|clamp }}%"></div></div>
+  <span class="meter-value">{{ pct|pct }}</span>
+</div>
+{%- if level == 'tight' %}<span class="status status-warn">{{ icon('alert', 'icon-sm') }}above target</span>{% endif %}
+{%- if level == 'over' %}<span class="status status-crit">{{ icon('x-circle', 'icon-sm') }}over capacity</span>{% endif %}
+{%- endmacro %}
+{% macro status_badge(st, unconfirmed) -%}
+{% if st == 'pass' %}<span class="status status-ok">{{ icon('check', 'icon-sm') }}meets</span>
+{% elif st == 'fail' %}<span class="status status-crit">{{ icon('x', 'icon-sm') }}fails</span>
+{% elif st == 'unknown' %}<span class="status status-muted">no data</span>{% endif %}
+{% if unconfirmed %}<span class="status status-warn" title="Orange cell in the capacity sheet: not tested or confirmed yet">unconfirmed</span>{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<section class="hero reveal" aria-labelledby="report-title">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Sizing report #{{ a.id }} · Replacement for {{ h.model or 'unknown model' }}{% if v.customer %} · {{ v.customer }}{% endif %}</p>
+      <h1 id="report-title">
+        <span class="from">{{ h.model or '?' }}</span>
+        {% if rec %}<span class="arrow" aria-label="replaced by">{{ icon('arrow-right', 'icon-lg') }}</span><span>{{ rec.model }}</span>{% endif %}
+      </h1>
+      <p class="hero-sub">{{ a.filename }} · generated {{ v.generated_at }}</p>
+    </div>
+    <div class="hero-actions no-print">
+      <button class="btn btn-on-dark" type="button" onclick="window.print()">{{ icon('printer') }}<span>Print / PDF</span></button>
+      <a class="btn btn-on-dark" href="/analyses/{{ a.id }}/report.json">{{ icon('download') }}<span>JSON</span></a>
+      <form method="post" action="/analyses/{{ a.id }}/delete" onsubmit="return confirm('Delete this analysis? This cannot be undone.');">
+        <button class="btn btn-on-dark btn-danger-on-dark" type="submit" title="Delete this analysis">{{ icon('trash') }}<span>Delete</span></button>
+      </form>
+    </div>
+  </div>
+  <div class="hero-meta">
+    <span class="chip chip-glass">{{ icon('server', 'icon-sm') }}PAN-OS {{ h.panos or '–' }}</span>
+    <span class="chip chip-glass">{{ icon('clock', 'icon-sm') }}Uptime {{ h.uptime|num }} days</span>
+    <span class="chip chip-glass">{{ icon('layers', 'icon-sm') }}{{ h.ha }}</span>
+    <span class="chip chip-glass">{{ icon('code', 'icon-sm') }}{{ h.config_source or 'no config' }}{% if h.panorama %} · Panorama-managed{% endif %}</span>
+    <span class="chip chip-glass">{{ icon('gauge', 'icon-sm') }}Sized on {{ h.basis }} throughput</span>
+    {% if v.need_poe %}<span class="chip chip-glass">{{ icon('plug', 'icon-sm') }}PoE needed{% if v.poe.ports_in_use %} · in use on {{ v.poe.ports_in_use|length }} port(s){% endif %}</span>{% endif %}
+  </div>
+</section>
+
+<nav class="tabs no-print" aria-label="Report sections">
+  {% if w and w.html %}<a href="#summary">Summary</a>{% endif %}
+  <a href="#recommendation" {% if not (w and w.html) %}class="active"{% endif %}>Recommendation</a>
+  {% if v.warnings %}<a href="#checks">Check before quoting <span class="chip chip-warn" style="margin-left:6px;padding:0 7px">{{ v.warnings|length }}</span></a>{% endif %}
+  <a href="#usage">Usage</a>
+  <a href="#requirements">Requirements</a>
+  <a href="#interfaces">Interfaces</a>
+  {% if v.rejected %}<a href="#rejected">Not qualifying</a>{% endif %}
+  <a href="#history">History &amp; licenses</a>
+</nav>
+
+{% set w = v.writeup %}
+{% if w and w.html %}
+<section class="card summary reveal" id="summary" aria-labelledby="sum-h">
+  <div class="card-head">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('sparkles') }}</span><div><h2 id="sum-h">Summary</h2><p class="muted small">Written by {{ w.label }}{% if w.local %} · local{% endif %} · {{ w.seconds }} s · {{ w.generated_at }}. Draft: check before sharing.</p></div></div>
+    <form method="post" action="/analyses/{{ a.id }}/summary" class="no-print"><button class="btn btn-ghost" type="submit" title="Write the summary again with the current AI settings">{{ icon('history') }}<span>Rewrite</span></button></form>
+  </div>
+  {% if w.unverified_numbers or w.unverified_models %}
+  <div class="callout callout-warn" style="margin-bottom:14px">{{ icon('alert') }}<div><strong>Fact check:</strong> the summary mentions {% if w.unverified_models %}model(s) {{ w.unverified_models|join(', ') }}{% endif %}{% if w.unverified_models and w.unverified_numbers %} and {% endif %}{% if w.unverified_numbers %}number(s) {{ w.unverified_numbers|join(', ') }}{% endif %} that are not in the sizing data. Check or rewrite before sharing.</div></div>
+  {% else %}
+  <p class="xs" style="margin:-6px 0 12px"><span class="status status-ok">{{ icon('check', 'icon-sm') }}fact check passed</span> every number and model in the text comes from the sizing data</p>
+  {% endif %}
+  <div class="prose">{{ w.html|safe }}</div>
+</section>
+{% elif w and w.error %}
+<div class="callout callout-warn no-print" role="status">{{ icon('alert') }}<div><strong>No AI summary:</strong> {{ w.error }}<form method="post" action="/analyses/{{ a.id }}/summary" style="display:inline;margin-left:8px"><button class="btn btn-ghost" type="submit">Try again</button></form> <a href="/settings">AI settings</a></div></div>
+{% endif %}
+
+<section id="recommendation" aria-labelledby="rec-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('sparkles') }}</span><h2 id="rec-h">Recommendation</h2></div>
+  {% if v.cards %}
+  <div class="recs">
+    {% for c in v.cards %}
+    <article class="rec reveal {% if loop.first %}rec-primary{% endif %}">
+      <div class="rec-head">
+        <div>
+          <span class="chip {{ 'chip-primary' if loop.first else '' }}">{% if loop.first %}{{ icon('check', 'icon-sm') }}{% endif %}{{ c.tier }}</span>
+          <p class="rec-model">{{ c.model }}</p>
+          <p class="rec-family">{{ c.family }} family{% if c.variants %} · {{ c.variants|join(', ') }} variant{% endif %}</p>
+        </div>
+        {% if c.dedicated_ha %}<span class="chip chip-good" title="Dedicated HA ports">{{ icon('plug', 'icon-sm') }}HA ports</span>{% endif %}
+      </div>
+      <div class="specs">
+        {% for sp in c.specs %}
+        <div class="spec">
+          <div class="spec-top"><span>{{ sp.label }}</span><strong>{{ sp.value }} {{ sp.unit }}{% if sp.times %} <span class="muted xs">· {{ sp.times }}×</span>{% endif %}</strong></div>
+          <div class="spec-bar" role="img" aria-label="{{ sp.label }}: {{ sp.value }} {{ sp.unit }}{% if sp.current %}, current model {{ sp.current }} {{ sp.unit }}{% endif %}">
+            <i style="width: {{ sp.pct|clamp }}%"></i>{% if sp.current_pct is not none %}<b style="left: calc({{ sp.current_pct|clamp }}% - 1px)"></b>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <dl class="kv">
+        <dt>Ports</dt><dd>{{ c.ports }}</dd>
+        {% if v.need_poe or c.poe_ports %}<dt>PoE ports</dt><dd>{{ c.poe_ports or 'none' }}</dd>{% endif %}
+      </dl>
+      {% if c.tightest or c.unconfirmed or c.unknown_features or c.too_large %}
+      <div class="rec-notes">
+        {% if c.tightest %}<p>{{ icon('gauge', 'icon-sm') }}<span><strong>Closest limits:</strong> {{ c.tightest|join('; ') }}</span></p>{% endif %}
+        {% if c.too_large %}<p>{{ icon('alert', 'icon-sm') }}<span>Larger than the size cap: {{ c.too_large }}</span></p>{% endif %}
+        {% if c.unconfirmed %}<p>{{ icon('alert', 'icon-sm') }}<span><span class="status status-warn">unconfirmed</span> relies on unconfirmed sheet values: {{ c.unconfirmed|join(', ') }}</span></p>{% endif %}
+        {% if c.unknown_features %}<p>{{ icon('info', 'icon-sm') }}<span>Check support for {{ c.unknown_features|join(', ') }}: not in the capacity sheet</span></p>{% endif %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <div class="spec-legend" style="margin-top:12px"><span><i></i>candidate</span><span><b></b>current {{ h.model }}</span></div>
+  <details class="disclosure" data-print-open style="margin-top:14px">
+    <summary><span class="small">How the models were chosen</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+    <div class="body rules">
+      Every capacity ≥ usage × growth ({{ v.params.growth_pct_per_year|num }}%/year over {{ v.params.years }} years = ×{{ v.params.growth_factor|num(2) }});
+      performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model;
+      object, rule and interface counts at least the current model's (per-item limits such as members per address group only need to cover usage);
+      ports: {{ v.port_rule }}; features in use supported;
+      {% if v.need_poe %}PoE needed: only models with PoE ports;{% else %}PoE not needed: dedicated PoE models left out;{% endif %}
+      {% if v.size_cap %}at most {{ v.params.max_size_factor|num }}× the current performance ({{ v.size_cap|num }} Gbps);{% endif %}
+      {% if v.excluded_families %}previous generations left out ({% for fam, succ in v.excluded_families.items() %}{{ fam }} → {{ succ }}{% if not loop.last %}, {% endif %}{% endfor %});{% elif v.params.include_superseded %}previous generations included;{% endif %}
+      unreleased (NPI) models excluded.
+    </div>
+  </details>
+  {% else %}
+  <div class="callout callout-warn" role="alert">
+    {{ icon('alert') }}
+    <div><strong>No model meets every rule.</strong><p>See the models that don't qualify below for what blocks each one.</p></div>
+  </div>
+  {% endif %}
+</section>
+
+{% if v.warnings %}
+<section id="checks" aria-labelledby="warn-h">
+  <div class="section-title"><span class="icon-bubble" style="background:var(--warn-soft);color:var(--warn)">{{ icon('alert') }}</span><h2 id="warn-h">Check before quoting</h2></div>
+  <ul class="checks" style="list-style:none;margin:0;padding:0">
+    {% for w in v.warnings %}<li class="check-item">{{ icon('alert') }}<span>{{ w }}</span></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section id="usage" aria-labelledby="kpi-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('activity') }}</span><h2 id="kpi-h">Current usage at a glance</h2></div>
+  {% set kpi_icons = ['activity', 'layers', 'cpu', 'list', 'box', 'plug'] %}
+  <div class="kpis">
+    {% for k in v.kpis %}
+    <div class="kpi reveal">
+      <div class="kpi-head"><span>{{ k.label }}</span><span class="icon-bubble">{{ icon(kpi_icons[loop.index0] if loop.index0 < 6 else 'activity', 'icon-sm') }}</span></div>
+      <p class="kpi-value">{{ k.value }}<span class="kpi-unit">{{ k.unit }}</span></p>
+      <p class="kpi-sub">{{ k.sub }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="requirements" aria-labelledby="req-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('gauge') }}</span><div><h2 id="req-h">Requirements: current model vs {{ rec.model if rec else 'recommendation' }}</h2><p class="muted small">Bar: how full the current {{ h.model }} is. Required: usage plus growth{% if rec %}; last columns: does the {{ rec.model }} cover it{% endif %}. Target utilization {{ v.target|num }}%.</p></div></div>
+  {% set shown = v.req_rows|selectattr('interesting')|list %}
+  {% set rest = v.req_rows|rejectattr('interesting')|list %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr>
+      <th scope="col">Capacity</th><th scope="col" class="num">In use</th><th scope="col">Basis</th>
+      <th scope="col" class="num">{{ h.model }} limit</th><th scope="col">Usage of current</th>
+      <th scope="col" class="num">Required</th>
+      {% if rec %}<th scope="col" class="num">{{ rec.model }}</th><th scope="col">Result</th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for r in shown %}
+      <tr>
+        <th scope="row">{{ r.label }}</th>
+        <td class="num">{{ r.observed|num(3) }} {{ r.unit }}</td>
+        <td class="small muted">{{ r.basis }}</td>
+        <td class="num">{{ r.current|num }} {{ r.unit if r.current is not none else '' }}</td>
+        <td>{{ meter(r.util, r.level, r.label) }}</td>
+        <td class="num">{{ r.required|num(3) }} {{ r.unit }}</td>
+        {% if rec %}<td class="num"><strong>{{ r.rec|num }}</strong> {{ r.unit if r.rec is number else '' }}</td><td>{{ status_badge(r.status, r.unconfirmed) }}</td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if rest %}
+  <details class="more">
+    <summary>{{ icon('chevron-down', 'icon-sm') }}{{ rest|length }} more capacities with nothing in use</summary>
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Capacity</th><th scope="col" class="num">{{ h.model }} limit</th>{% if rec %}<th scope="col" class="num">{{ rec.model }}</th><th scope="col">Result</th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in rest %}
+        <tr><th scope="row">{{ r.label }}</th><td class="num">{{ r.current|num }}</td>{% if rec %}<td class="num">{{ r.rec|num }}</td><td>{{ status_badge(r.status, r.unconfirmed) }}</td>{% endif %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endif %}
+</section>
+
+<section id="interfaces" aria-labelledby="ports-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('plug') }}</span><h2 id="ports-h">Interfaces</h2></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><div><h3>Ports on the current {{ h.model }}</h3><p>Configured ports and what they do</p></div></div>
+      <div class="port-grid">
+        {% for p in v.ports %}
+        <div class="port port-{{ p.role }}">
+          <strong>{{ p.name }}</strong>
+          <span class="chip role {{ 'chip-primary' if p.role == 'traffic' else ('chip-warn' if p.role == 'ha' else '') }}">{{ p.role }}</span>
+          <span>{{ p.speed_class }}{% if p.assumed %} <span class="muted xs" title="Not shown in the TSF; the current model only has this port type">(assumed)</span>{% endif %}</span>
+          <span class="muted">{{ p.zone or '–' }} · link {{ p.state or '–' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if v.rec_plan %}
+    <div class="card">
+      <div class="card-head"><div><h3>Port mapping on the {{ rec.model }}</h3><p>Rule: {{ v.port_rule }}</p></div></div>
+      <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th scope="col">Needed</th><th scope="col">Served by</th></tr></thead>
+        <tbody>
+        {% for need, served in v.rec_plan.items() %}
+          <tr><th scope="row">{{ need }}</th><td>{% for cls, n in served.items() %}<span class="chip chip-primary">{{ n }}× {{ cls }}</span> {% endfor %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if v.rejected %}
+<section id="rejected" aria-labelledby="rej-h">
+  <div class="section-title"><span class="icon-bubble" style="background:var(--surface-3);color:var(--muted)">{{ icon('x-circle') }}</span><h2 id="rej-h">Models that don't qualify</h2></div>
+  <details class="more" data-print-open {% if not v.cards %}open{% endif %}>
+    <summary>{{ icon('chevron-down', 'icon-sm') }}{{ v.rejected|length }} models: too large or not meeting every rule</summary>
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Model</th><th scope="col">Why not</th></tr></thead>
+      <tbody>
+      {% for c in v.rejected %}
+        <tr><th scope="row" class="nowrap">{{ c.model }}<br><span class="muted xs">{{ c.family }}</span></th><td><ul class="reasons">{% for reason in c.reasons[:4] %}<li>{{ reason }}</li>{% endfor %}{% if c.reasons|length > 4 %}<li class="muted">+{{ c.reasons|length - 4 }} more</li>{% endif %}</ul></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+</section>
+{% endif %}
+
+<section id="history" class="grid-2" aria-label="Load history and licenses">
+  <div class="card">
+    <div class="card-head"><div><h3>Load history</h3><p>From the firewall's resource monitor (reset by a reboot)</p></div></div>
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Period</th><th scope="col" class="num">Peak CPU</th><th scope="col" class="num">Avg CPU</th><th scope="col" class="num">Peak sessions</th><th scope="col" class="num">Samples</th></tr></thead>
+      <tbody>
+      {% for p in v.history %}
+        <tr><th scope="row">{{ p.period }}</th><td class="num">{{ p.dp_cpu_peak_pct|pct }}</td><td class="num">{{ p.dp_cpu_avg_pct|pct }}</td><td class="num">{{ p.session_util_peak_pct|pct }}</td><td class="num">{{ p.samples_with_data }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div><h3>Licenses</h3><p>{{ v.licenses_active|length }} active, {{ v.licenses_expired|length }} expired</p></div></div>
+    <ul class="tags">
+      {% for l in v.licenses_active %}<li class="chip chip-good">{{ icon('key', 'icon-sm') }}{{ l }}</li>{% endfor %}
+      {% for l in v.licenses_expired %}<li class="chip tag-expired"><span class="sr-only">Expired: </span>{{ l }} (expired)</li>{% endfor %}
+    </ul>
+  </div>
+</section>
+
+<footer class="small muted">
+  <p>Sources: {{ v.files_used.values()|join(', ') }}{% if h.config_source and h.config_source not in v.files_used.values() %}, {{ h.config_source }}{% endif %}.
+  Capacity data: {{ v.portfolio.filename or '–' }} (PAN-OS {{ v.portfolio.panos_release or '?' }}, imported {{ v.portfolio.imported_at or '?' }}).</p>
+</footer>
+{% endblock %}

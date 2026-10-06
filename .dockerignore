@@ -1,0 +1,16 @@
+# Keep customer data, the capacity workbook and dev clutter out of the image.
+.git
+.claude
+data
+docs
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+**/.venv
+backend/tests
+*.xlsx
+*.xls
+*.tgz
+*.tar.gz
+*.db

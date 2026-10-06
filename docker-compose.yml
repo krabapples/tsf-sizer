@@ -1,0 +1,58 @@
+services:
+  tsf-sizer:
+    build: .
+    image: tsf-sizer:latest
+    container_name: tsf-sizer
+    ports:
+      # Local use: only reachable from this machine. Change the host port with
+      # TSF_SIZER_PORT (e.g. in .env). For a shared server put a reverse proxy
+      # with HTTPS in front and drop the "127.0.0.1:" prefix.
+      - "127.0.0.1:${TSF_SIZER_PORT:-8088}:8088"
+    volumes:
+      - tsf-sizer-data:/data
+    environment:
+      # Optional login (HTTP basic auth). Set both to enable it.
+      TSF_SIZER_USER: ${TSF_SIZER_USER:-}
+      TSF_SIZER_PASSWORD: ${TSF_SIZER_PASSWORD:-}
+      TSF_SIZER_MAX_UPLOAD_MB: ${TSF_SIZER_MAX_UPLOAD_MB:-1024}
+      # Optional AI summary (also configurable on the AI settings page, which
+      # overrides these). Provider: none | ollama | openai | anthropic.
+      TSF_SIZER_LLM_PROVIDER: ${TSF_SIZER_LLM_PROVIDER:-none}
+      TSF_SIZER_LLM_BASE_URL: ${TSF_SIZER_LLM_BASE_URL:-}
+      TSF_SIZER_LLM_MODEL: ${TSF_SIZER_LLM_MODEL:-}
+      TSF_SIZER_LLM_API_KEY: ${TSF_SIZER_LLM_API_KEY:-}
+      TSF_SIZER_LLM_TIMEOUT: ${TSF_SIZER_LLM_TIMEOUT:-180}
+    extra_hosts:
+      # Lets the container reach an Ollama / LM Studio running on this machine
+      # as http://host.docker.internal:<port> (built in on Docker Desktop).
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  # Optional: Ollama in a container next to the app. Start with
+  #   docker compose --profile ollama up -d
+  #   docker compose exec ollama ollama pull llama3.1:8b
+  # and use server URL http://ollama:11434 on the AI settings page.
+  # Not published on a host port: only tsf-sizer can reach it.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: tsf-sizer-ollama
+    profiles: ["ollama"]
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    # NVIDIA GPU (needs the NVIDIA Container Toolkit): uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  tsf-sizer-data:
+  ollama-models:

@@ -1,0 +1,144 @@
+<?xml version="1.0"?>
+<config version="11.1.0" urldb="paloaltonetworks">
+  <shared>
+    <address>
+      <entry name="shared-fqdn"><fqdn>updates.example.com</fqdn></entry>
+    </address>
+    <service>
+      <entry name="tcp-8443"><protocol><tcp><port>8443</port></tcp></protocol></entry>
+    </service>
+  </shared>
+  <devices>
+    <entry name="localhost.localdomain">
+      <deviceconfig>
+        <system>
+          <panorama><local-panorama><panorama-server>192.0.2.5</panorama-server></local-panorama></panorama>
+        </system>
+        <setting><advance-routing>yes</advance-routing></setting>
+        <high-availability>
+          <enabled>yes</enabled>
+          <interface>
+            <ha1><port>ha1-a</port></ha1>
+            <ha2><port>ethernet1/8</port></ha2>
+          </interface>
+          <group><group-id>1</group-id><mode><active-passive/></mode></group>
+        </high-availability>
+      </deviceconfig>
+      <network>
+        <interface>
+          <ethernet>
+            <entry name="ethernet1/1">
+              <layer3>
+                <units>
+                  <entry name="ethernet1/1.10"><tag>10</tag></entry>
+                  <entry name="ethernet1/1.20"><tag>20</tag></entry>
+                </units>
+              </layer3>
+            </entry>
+            <entry name="ethernet1/2"><aggregate-group>ae1</aggregate-group></entry>
+            <entry name="ethernet1/3"><aggregate-group>ae1</aggregate-group></entry>
+            <entry name="ethernet1/4"><virtual-wire/></entry>
+            <entry name="ethernet1/5"><virtual-wire/></entry>
+            <entry name="ethernet1/8"><ha/></entry>
+          </ethernet>
+          <aggregate-ethernet>
+            <entry name="ae1"><layer3><units><entry name="ae1.100"/></units></layer3></entry>
+          </aggregate-ethernet>
+          <tunnel><units><entry name="tunnel.1"/><entry name="tunnel.2"/></units></tunnel>
+          <loopback><units><entry name="loopback.1"/></units></loopback>
+        </interface>
+        <virtual-wire><entry name="vw1"/></virtual-wire>
+        <logical-router>
+          <entry name="default">
+            <vrf>
+              <entry name="default">
+                <routing-table>
+                  <ip>
+                    <static-route>
+                      <entry name="r1"/><entry name="r2"/><entry name="r3"/>
+                    </static-route>
+                  </ip>
+                </routing-table>
+                <bgp>
+                  <peer-group>
+                    <entry name="isp"><peer><entry name="isp1"/><entry name="isp2"/></peer></entry>
+                  </peer-group>
+                </bgp>
+              </entry>
+            </vrf>
+          </entry>
+        </logical-router>
+        <virtual-router>
+          <entry name="legacy">
+            <routing-table><ip><static-route><entry name="old"/></static-route></ip></routing-table>
+          </entry>
+        </virtual-router>
+        <ike><gateway><entry name="branch1"/><entry name="branch2"/></gateway></ike>
+        <tunnel>
+          <ipsec><entry name="branch1"/><entry name="branch2"/></ipsec>
+          <global-protect-gateway><entry name="gw"/></global-protect-gateway>
+        </tunnel>
+        <dhcp>
+          <interface>
+            <entry name="ethernet1/1.10"><relay><ip><enabled>yes</enabled></ip></relay></entry>
+            <entry name="ethernet1/1.20"><server/></entry>
+          </interface>
+        </dhcp>
+      </network>
+      <vsys>
+        <entry name="vsys1">
+          <zone>
+            <entry name="trust"/><entry name="untrust"/><entry name="dmz"/>
+          </zone>
+          <address>
+            <entry name="web1"><ip-netmask>10.0.0.10</ip-netmask></entry>
+            <entry name="web2"><ip-netmask>10.0.0.11</ip-netmask></entry>
+            <entry name="api"><fqdn>api.example.com</fqdn></entry>
+          </address>
+          <address-group>
+            <entry name="web"><static><member>web1</member><member>web2</member></static></entry>
+            <entry name="dyn"><dynamic><filter>'tag1'</filter></dynamic></entry>
+          </address-group>
+          <service-group><entry name="web-ports"><members><member>tcp-8443</member></members></entry></service-group>
+          <application><entry name="custom-app"/></application>
+          <external-list>
+            <entry name="bad-ips"><type><ip><url>https://example.com/ips</url></ip></type></entry>
+            <entry name="bad-domains"><type><domain><url>https://example.com/d</url></domain></type></entry>
+          </external-list>
+          <profiles>
+            <virus><entry name="av"/></virus>
+            <spyware><entry name="as"/><entry name="as-strict"/></spyware>
+            <url-filtering><entry name="url"/></url-filtering>
+            <decryption><entry name="dec"/></decryption>
+            <custom-url-category>
+              <entry name="allow"><list><member>a.example.com</member><member>b.example.com</member></list></entry>
+            </custom-url-category>
+          </profiles>
+          <rulebase>
+            <security>
+              <rules>
+                <entry name="r1" panorama="yes"/><entry name="r2"/><entry name="r3"/>
+              </rules>
+            </security>
+            <default-security-rules>
+              <rules><entry name="intrazone-default"/><entry name="interzone-default"/></rules>
+            </default-security-rules>
+            <nat>
+              <rules>
+                <entry name="out"><source-translation><dynamic-ip-and-port><interface-address/></dynamic-ip-and-port></source-translation></entry>
+                <entry name="pool"><source-translation><dynamic-ip><translated-address><member>p</member></translated-address></dynamic-ip></source-translation></entry>
+                <entry name="web"><destination-translation><translated-address>10.0.0.10</translated-address></destination-translation></entry>
+              </rules>
+            </nat>
+            <decryption><rules><entry name="dec-out"/></rules></decryption>
+          </rulebase>
+        </entry>
+        <entry name="vsys2">
+          <zone><entry name="lab"/></zone>
+          <address><entry name="lab1"><ip-netmask>10.9.0.1</ip-netmask></entry></address>
+          <rulebase><security><rules><entry name="lab-allow"/></rules></security></rulebase>
+        </entry>
+      </vsys>
+    </entry>
+  </devices>
+</config>

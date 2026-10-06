@@ -1,0 +1,12 @@
+*.xlsx
+*.xls
+*.tgz
+*.tar.gz
+/data/
+/backend/data/
+*.db
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/

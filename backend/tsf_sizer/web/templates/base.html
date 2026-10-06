@@ -1,0 +1,46 @@
+{% from "_icons.html" import icon with context %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TSF Sizer{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="preload" href="{{ url_for('static', path='fonts/plus-jakarta-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <script>
+    // Apply a saved theme before first paint (no flash).
+    try { var t = localStorage.getItem('tsf-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="TSF Sizer home">
+        <span class="brand-mark">{{ icon('shield') }}</span>
+        <span>TSF Sizer<small>Firewall replacement sizing</small></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <p class="nav-label">Workspace</p>
+        <a href="/" {% if request.url.path == '/' or request.url.path.startswith('/analyses') %}aria-current="page"{% endif %}>{{ icon('sparkles') }}<span>Analyses</span></a>
+        <a href="/portfolio" {% if request.url.path.startswith('/portfolio') %}aria-current="page"{% endif %}>{{ icon('database') }}<span>Portfolio</span></a>
+        <a href="/settings" {% if request.url.path.startswith('/settings') %}aria-current="page"{% endif %}>{{ icon('cpu') }}<span>AI settings</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Switch light/dark theme">
+          {{ icon('moon') }}<span>Theme</span>
+        </button>
+        <p class="sidebar-note">Presales tool. Reports contain customer data: handle as confidential. Recommendations are a draft for engineer review.</p>
+      </div>
+    </aside>
+    <main id="main" class="main">
+      <div class="content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
