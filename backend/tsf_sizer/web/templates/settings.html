@@ -37,7 +37,7 @@
       <div class="field">
         <label for="base_url">Server URL</label>
         <input id="base_url" name="base_url" type="text" value="{{ cfg.base_url }}" placeholder="{{ default_urls.get(cfg.provider, '') }}" autocomplete="off" spellcheck="false">
-        <p class="hint">Empty = default. Ollama on the same machine as Docker: <code>http://host.docker.internal:11434</code>; the Ollama container from docker-compose: <code>http://ollama:11434</code>. OpenAI-compatible servers: include <code>/v1</code>.</p>
+        <p class="hint">Empty = default. <strong>Not <code>localhost</code></strong> (inside the container that is the container itself). Ollama on the same machine as Docker: <code>http://host.docker.internal:11434</code>; the Ollama container from docker-compose: <code>http://ollama:11434</code>. OpenAI-compatible servers: include <code>/v1</code>.</p>
       </div>
       <div class="field">
         <label for="model">Model</label>

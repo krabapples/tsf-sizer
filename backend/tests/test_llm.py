@@ -291,3 +291,9 @@ def test_llm_failure_does_not_fail_analysis(client):
     assert "Cannot reach" in data["writeup"]["error"]
     assert data["sizing"]["recommended"]
     assert "Try again" in client.get(f"/analyses/{analysis_id}").text
+
+
+def test_localhost_hint_inside_container(monkeypatch):
+    monkeypatch.setattr("tsf_sizer.llm.providers.os.path.exists", lambda p: p == "/.dockerenv")
+    with pytest.raises(LLMError, match="host.docker.internal"):
+        chat(LLMConfig("ollama", "http://localhost:9", "m", timeout=5), "s", "u")

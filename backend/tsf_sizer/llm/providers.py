@@ -11,8 +11,10 @@ All calls are plain HTTPS/HTTP POSTs; nothing is sent anywhere else.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
@@ -65,6 +67,19 @@ class LLMReply:
     seconds: float
 
 
+def _localhost_hint(url: str) -> str:
+    """Inside a container, localhost is the container itself, not the machine it runs on."""
+    host = urllib.parse.urlparse(url).hostname or ""
+    if host in ("localhost", "127.0.0.1", "::1") and os.path.exists("/.dockerenv"):
+        return (
+            ". 'localhost' is this container, not your computer: use "
+            "http://host.docker.internal:11434 (or leave the URL empty) for an Ollama running "
+            "on the same machine. On Linux, Ollama must listen on all interfaces "
+            "(OLLAMA_HOST=0.0.0.0), and docker-compose.yml must be up to date"
+        )
+    return ""
+
+
 def _request(
     method: str,
     url: str,
@@ -87,7 +102,7 @@ def _request(
         detail = e.read().decode(errors="replace")[:300]
         raise LLMError(f"{url} answered HTTP {e.code}: {detail}") from None
     except urllib.error.URLError as e:
-        raise LLMError(f"Cannot reach {url}: {e.reason}") from None
+        raise LLMError(f"Cannot reach {url}: {e.reason}{_localhost_hint(url)}") from None
     except TimeoutError:
         raise LLMError(f"{url} did not answer within {timeout:.0f} s") from None
     except json.JSONDecodeError:
