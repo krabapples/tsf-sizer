@@ -38,7 +38,7 @@ from ..llm.providers import (
     list_models,
 )
 from ..llm.writeup import SYSTEM_PROMPT, build_facts
-from ..pipeline import regenerate_writeup, run_job
+from ..pipeline import regenerate_writeup, rerun_job, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
 from ..sizing.engine import SizingParams
@@ -167,6 +167,47 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             max_mb=settings.max_upload // CHUNK,
         )
 
+    def build_params(
+        growth_pct: float,
+        years: int,
+        target_util_pct: float,
+        peak_throughput_mbps: str,
+        peak_cps: str,
+        peak_sessions: str,
+        port_rule: str,
+        include_superseded: str,
+        need_poe: str,
+        max_size_factor: float,
+    ) -> SizingParams:
+        def opt(v: str) -> float | None:
+            v = v.strip().replace(",", "")
+            if not v:
+                return None
+            try:
+                f = float(v)
+            except ValueError:
+                raise HTTPException(400, f"'{v}' is not a number") from None
+            if f < 0:
+                raise HTTPException(400, "Peaks cannot be negative")
+            return f
+
+        if not (0 <= growth_pct <= 200 and 1 <= years <= 10 and 10 <= target_util_pct <= 100):
+            raise HTTPException(400, "Growth 0-200%, years 1-10, target utilization 10-100%")
+        if not (max_size_factor == 0 or 1 < max_size_factor <= 100):
+            raise HTTPException(400, "Maximum size must be above 1x (or 0 for no limit)")
+        return SizingParams(
+            growth_pct_per_year=growth_pct,
+            years=years,
+            target_util_pct=target_util_pct,
+            peak_throughput_mbps=opt(peak_throughput_mbps),
+            peak_cps=opt(peak_cps),
+            peak_sessions=opt(peak_sessions),
+            port_rule="used" if port_rule == "used" else "all",
+            include_superseded=bool(include_superseded),
+            need_poe=bool(need_poe),
+            max_size_factor=max_size_factor,
+        )
+
     @app.post("/analyses")
     async def create_analysis(
         tsf: UploadFile = File(...),
@@ -184,33 +225,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         need_poe: str = Form(""),
         max_size_factor: float = Form(5.0),
     ):
-        def opt(v: str) -> float | None:
-            v = v.strip().replace(",", "")
-            if not v:
-                return None
-            try:
-                f = float(v)
-            except ValueError:
-                raise HTTPException(400, f"'{v}' is not a number") from None
-            if f < 0:
-                raise HTTPException(400, "Peaks cannot be negative")
-            return f
-
-        if not (0 <= growth_pct <= 200 and 1 <= years <= 10 and 10 <= target_util_pct <= 100):
-            raise HTTPException(400, "Growth 0-200%, years 1-10, target utilization 10-100%")
-        if not (max_size_factor == 0 or 1 < max_size_factor <= 100):
-            raise HTTPException(400, "Maximum size must be above 1x (or 0 for no limit)")
-        params = SizingParams(
-            growth_pct_per_year=growth_pct,
-            years=years,
-            target_util_pct=target_util_pct,
-            peak_throughput_mbps=opt(peak_throughput_mbps),
-            peak_cps=opt(peak_cps),
-            peak_sessions=opt(peak_sessions),
-            port_rule="used" if port_rule == "used" else "all",
-            include_superseded=bool(include_superseded),
-            need_poe=bool(need_poe),
-            max_size_factor=max_size_factor,
+        params = build_params(
+            growth_pct,
+            years,
+            target_util_pct,
+            peak_throughput_mbps,
+            peak_cps,
+            peak_sessions,
+            port_rule,
+            include_superseded,
+            need_poe,
+            max_size_factor,
         )
         tsf_path = await save_upload(tsf, ".tsf")
         config_path, config_name = None, None
@@ -245,6 +270,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Analysis not found")
         return row
 
+    @app.post("/analyses/{analysis_id}/rerun")
+    def rerun_analysis(
+        analysis_id: int,
+        growth_pct: float = Form(20.0),
+        years: int = Form(3),
+        target_util_pct: float = Form(70.0),
+        peak_throughput_mbps: str = Form(""),
+        peak_cps: str = Form(""),
+        peak_sessions: str = Form(""),
+        port_rule: str = Form("all"),
+        ai_summary: str = Form(""),
+        include_superseded: str = Form(""),
+        need_poe: str = Form(""),
+        max_size_factor: float = Form(5.0),
+    ):
+        """Size a finished analysis again with other assumptions; no re-upload needed."""
+        row = load(analysis_id)
+        if row["status"] != "done" or not row["result_json"]:
+            raise HTTPException(409, "Only a finished analysis can be re-run")
+        params = build_params(
+            growth_pct,
+            years,
+            target_util_pct,
+            peak_throughput_mbps,
+            peak_cps,
+            peak_sessions,
+            port_rule,
+            include_superseded,
+            need_poe,
+            max_size_factor,
+        )
+        with conn() as c:
+            c.execute("UPDATE analysis SET status='running', error=NULL WHERE id=?", (analysis_id,))
+        app.state.executor.submit(
+            rerun_job, settings.db_path, analysis_id, params, bool(ai_summary)
+        )
+        return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
+
     @app.get("/analyses/{analysis_id}", response_class=HTMLResponse)
     def show_analysis(request: Request, analysis_id: int):
         row = load(analysis_id)
@@ -252,7 +315,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return render(request, "status.html", a=dict(row))
         result = json.loads(row["result_json"])
         view = report_view.build(result, dict(row))
-        return render(request, "report.html", a=dict(row), r=result, v=view)
+        with conn() as c:
+            superseded = catalog.superseded_families(c)
+            llm = llm_settings.load(c)
+        try:
+            opts = SizingParams(**json.loads(row["params_json"] or "{}"))
+        except TypeError:  # parameters saved by another version
+            opts = SizingParams()
+        return render(
+            request,
+            "report.html",
+            a=dict(row),
+            r=result,
+            v=view,
+            opts=opts,
+            superseded=superseded,
+            llm=llm,
+            had_writeup="writeup" in result,
+        )
 
     @app.get("/api/analyses/{analysis_id}")
     def analysis_status(analysis_id: int):

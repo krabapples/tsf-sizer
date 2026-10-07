@@ -104,6 +104,14 @@ class TsfSummary:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, d: dict) -> TsfSummary:
+        """Inverse of to_dict(): lets a stored analysis be sized again without the TSF."""
+        d = dict(d)
+        d["metrics"] = {k: Metric(**v) for k, v in (d.get("metrics") or {}).items()}
+        d["ports"] = [PortUse(**p) for p in d.get("ports") or []]
+        return cls(**d)
+
 
 # Capability strings / port types -> speed classes used in the capacity sheet.
 def speed_class(port_type: str | None, capability: str | None, runtime_speed: str | None) -> str:

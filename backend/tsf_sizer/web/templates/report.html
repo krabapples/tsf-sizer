@@ -48,6 +48,24 @@
   </div>
 </section>
 
+{% if a.error %}
+<div class="callout callout-error no-print" role="alert">{{ icon('x-circle') }}<div>{{ a.error }} The report below is the previous result.</div></div>
+{% endif %}
+<details class="card rerun no-print" id="rerun" {% if a.error %}open{% endif %}>
+  <summary class="rerun-head">
+    <span class="icon-bubble">{{ icon('sliders') }}</span>
+    <span class="rerun-title"><strong>Sizing assumptions</strong>
+      <span class="muted small">{{ opts.growth_pct_per_year|num }}% growth/yr over {{ opts.years }} yrs · {{ opts.target_util_pct|num }}% target utilization · {{ 'ports in use' if opts.port_rule == 'used' else 'full port layout' }}{% if opts.need_poe %} · PoE{% endif %}{% if opts.include_superseded %} · previous generations{% endif %}{% if opts.peak_throughput_mbps or opts.peak_cps or opts.peak_sessions %} · known peaks{% endif %}</span></span>
+    <span class="btn btn-sm">{{ icon('refresh') }}<span>Change and re-run</span></span>
+  </summary>
+  <form method="post" action="/analyses/{{ a.id }}/rerun" class="stack rerun-form">
+    <p class="muted small">The TSF is not needed again: the figures read from it are kept. Re-running also uses the portfolio that is active now.</p>
+    {% set ai_checked = llm.enabled and had_writeup %}{% set open_assumptions = true %}
+    {% include "_options.html" %}
+    <div><button type="submit" class="btn btn-primary">{{ icon('refresh') }}<span>Re-run sizing</span></button></div>
+  </form>
+</details>
+
 <nav class="tabs no-print" aria-label="Report sections">
   {% if w and w.html %}<a href="#summary">Summary</a>{% endif %}
   <a href="#recommendation" {% if not (w and w.html) %}class="active"{% endif %}>Recommendation</a>

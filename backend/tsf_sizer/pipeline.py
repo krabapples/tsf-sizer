@@ -17,11 +17,11 @@ from .llm import settings as llm_settings
 from .llm.writeup import write as write_summary
 from .portfolio import catalog
 from .sizing.engine import SizingParams, size
-from .tsf.archive import read_tsf
+from .tsf.archive import PanoramaTsfError, read_tsf
 from .tsf.compare import usage_against_model
 from .tsf.config import count_config
-from .tsf.metrics import summarize
-from .tsf.techsupport import parse_techsupport
+from .tsf.metrics import TsfSummary, summarize
+from .tsf.techsupport import panorama_reason, parse_techsupport
 
 
 def analyze(
@@ -36,6 +36,13 @@ def analyze(
     if source_name and files.member_names.get("techsupport") == tsf_path.name:
         files.member_names["techsupport"] = source_name  # loose .txt upload: show its real name
     facts = parse_techsupport(files.text("techsupport"))
+    if reason := panorama_reason(facts.system, files.member_names.get("techsupport")):
+        raise PanoramaTsfError(
+            f"This Tech Support File was generated on a Panorama management server ({reason}), "
+            "not on a firewall, so there is nothing to size. Generate a Tech Support File on the "
+            "firewall that is to be replaced (Device > Support > Generate Tech Support File) and "
+            "upload that one."
+        )
 
     config, config_source = None, None
     if config_path is not None:
@@ -49,17 +56,6 @@ def analyze(
                 break
 
     summary = summarize(facts, config, config_source)
-    doc = catalog.active_document(conn)
-    usage, sizing, portfolio_error = None, None, None
-    if doc is None:
-        portfolio_error = "No active portfolio: import the capacity workbook on the Portfolio page."
-    else:
-        try:
-            usage = usage_against_model(conn, summary, document_id=doc["id"])
-        except (LookupError, ValueError) as e:
-            portfolio_error = str(e)
-        sizing = size(conn, summary, params, document_id=doc["id"])
-
     return {
         "source": source_name or files.source,
         "files_used": files.member_names,
@@ -70,12 +66,41 @@ def analyze(
             "counters_of_interest": facts.counters_of_interest,
         },
         "config": asdict(config) if config else None,
+        **_size_summary(conn, summary, params),
+    }
+
+
+def _size_summary(conn: sqlite3.Connection, summary: TsfSummary, params: SizingParams) -> dict:
+    """The part of a result that depends on the portfolio and the sizing assumptions."""
+    doc = catalog.active_document(conn)
+    usage, sizing, portfolio_error = None, None, None
+    if doc is None:
+        portfolio_error = "No active portfolio: import the capacity workbook on the Portfolio page."
+    else:
+        try:
+            usage = usage_against_model(conn, summary, document_id=doc["id"])
+        except (LookupError, ValueError) as e:
+            portfolio_error = str(e)
+        sizing = size(conn, summary, params, document_id=doc["id"])
+    return {
         "usage": usage.to_dict() if usage else None,
         "sizing": sizing.to_dict() if sizing else None,
         "portfolio": dict(doc) if doc is not None else None,
         "portfolio_error": portfolio_error,
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
     }
+
+
+def resize(conn: sqlite3.Connection, result: dict, params: SizingParams) -> dict:
+    """Size a stored result again with other assumptions and/or the current portfolio.
+
+    The TSF is not needed: the result keeps the extracted figures. The old AI summary is
+    dropped because it described the old numbers.
+    """
+    summary = TsfSummary.from_dict(result["summary"])
+    new = {k: v for k, v in result.items() if k != "writeup"}
+    new.update(_size_summary(conn, summary, params))
+    return new
 
 
 def run_job(
@@ -122,6 +147,40 @@ def run_job(
         for p in (tsf_path, config_path):
             if p is not None:
                 p.unlink(missing_ok=True)
+
+
+def rerun_job(
+    db_path: str, analysis_id: int, params: SizingParams, ai_summary: bool = True
+) -> None:
+    """Background job: size a finished analysis again. Never raises.
+
+    On failure the previous result stays and the message is kept in `error` for the report page.
+    """
+    conn = db.connect(db_path)
+    try:
+        row = conn.execute("SELECT result_json FROM analysis WHERE id=?", (analysis_id,)).fetchone()
+        result = resize(conn, json.loads(row[0]), params)
+        if ai_summary:
+            _add_writeup(conn, analysis_id, result)
+        with conn:
+            conn.execute(
+                "UPDATE analysis SET status='done', error=NULL, params_json=?, result_json=?, "
+                "finished_at=datetime('now') WHERE id=?",
+                (json.dumps(params.__dict__), json.dumps(result, default=str), analysis_id),
+            )
+    except Exception as e:  # noqa: BLE001 - keep the old result, tell the user
+        for attempt in range(3):
+            try:
+                with conn:
+                    conn.execute(
+                        "UPDATE analysis SET status='done', error=? WHERE id=?",
+                        (f"The re-run failed: {type(e).__name__}: {e}", analysis_id),
+                    )
+                break
+            except sqlite3.OperationalError:
+                time.sleep(1 + attempt)
+    finally:
+        conn.close()
 
 
 def _add_writeup(conn: sqlite3.Connection, analysis_id: int, result: dict) -> None:

@@ -230,3 +230,87 @@ def test_portfolio_warns_when_performance_mapping_is_missing(client):
     conn.close()
     page = client.get("/portfolio").text
     assert "no performance data" in page and "perf.cps" in page
+
+
+def _post_tsf(c, text: str, name="techsupport_test.txt"):
+    r = c.post("/analyses", files={"tsf": (name, text.encode())}, follow_redirects=False)
+    return int(r.headers["location"].rsplit("/", 1)[1])
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("model: PA-3430", "model: M-200"),
+        ("model: PA-3430", "model: Panorama"),
+        ("model: PA-3430", "model: PA-3430\nsystem-mode: panorama"),
+        ("model: PA-3430", "model: PA-3430\nsystem-mode: logger"),
+    ],
+)
+def test_panorama_tsf_is_rejected_with_a_clear_message(client, old, new):
+    text = TECHSUPPORT.read_text().replace(old, new)
+    analysis_id = _post_tsf(client, text)
+    st = wait_done(client, analysis_id)
+    assert st["status"] == "error" and st["error"].startswith("PanoramaTsfError")
+    page = client.get(f"/analyses/{analysis_id}").text
+    assert "Panorama Tech Support File, not a firewall" in page and "Panorama file" in page
+    assert "Generate Tech Support File" in page
+    assert client.get(f"/analyses/{analysis_id}/report.json").status_code == 409
+
+
+def test_firewall_managed_by_panorama_is_still_analyzed(client):
+    # Mentions of Panorama elsewhere in the TSF (e.g. its config) must not trigger the check.
+    text = TECHSUPPORT.read_text() + "\npanorama-server 192.0.2.99\n"
+    assert wait_done(client, _post_tsf(client, text))["status"] == "done"
+
+
+def test_rerun_with_other_assumptions_without_the_tsf(client, tmp_path):
+    analysis_id = int(
+        upload(client, growth_pct="10", years="2", peak_cps="5,000")
+        .headers["location"]
+        .rsplit("/", 1)[1]
+    )
+    wait_done(client, analysis_id)
+    first = client.get(f"/analyses/{analysis_id}/report.json").json()
+    assert first["sizing"]["params"]["growth_pct_per_year"] == 10
+    page = client.get(f"/analyses/{analysis_id}").text
+    assert f'action="/analyses/{analysis_id}/rerun"' in page
+    assert 'value="5,000"' in page or 'value="5000"' in page  # form is prefilled
+
+    r = client.post(
+        f"/analyses/{analysis_id}/rerun",
+        data={
+            "growth_pct": "50",
+            "years": "5",
+            "target_util_pct": "60",
+            "port_rule": "used",
+            "need_poe": "1",
+            "max_size_factor": "3",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert wait_done(client, analysis_id)["status"] == "done"
+    second = client.get(f"/analyses/{analysis_id}/report.json").json()
+    params = second["sizing"]["params"]
+    assert (params["growth_pct_per_year"], params["years"], params["target_util_pct"]) == (
+        50,
+        5,
+        60,
+    )
+    assert params["port_rule"] == "used" and params["need_poe"] is True
+    assert params["peak_cps"] is None  # a blank field clears the earlier peak
+    assert second["summary"] == first["summary"]  # figures from the TSF are reused
+    assert second["generated_at"] and "writeup" not in second
+    assert list((tmp_path / "uploads").iterdir()) == []
+    # Bad input is refused and the stored result is untouched.
+    bad = client.post(f"/analyses/{analysis_id}/rerun", data={"growth_pct": "500"})
+    assert bad.status_code == 400
+    assert client.get(f"/analyses/{analysis_id}/report.json").json() == second
+
+
+def test_rerun_needs_a_finished_analysis(client):
+    r = client.post("/analyses", files={"tsf": ("notes.txt", b"hello")}, follow_redirects=False)
+    analysis_id = int(r.headers["location"].rsplit("/", 1)[1])
+    wait_done(client, analysis_id)  # fails: not a TSF
+    assert client.post(f"/analyses/{analysis_id}/rerun").status_code == 409
+    assert client.post("/analyses/999/rerun").status_code == 404

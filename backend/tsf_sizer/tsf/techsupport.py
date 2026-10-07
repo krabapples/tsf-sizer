@@ -92,6 +92,7 @@ def _uptime_seconds(s: str | None) -> int | None:
 SYSTEM_FIELDS = (
     "model",
     "family",
+    "system-mode",
     "sw-version",
     "uptime",
     "multi-vsys",
@@ -109,6 +110,28 @@ def parse_system_info(body: str) -> dict:
     info = {k: kv[k] for k in SYSTEM_FIELDS if k in kv}
     info["uptime_seconds"] = _uptime_seconds(kv.get("uptime"))
     return info
+
+
+_PANORAMA_MODEL = re.compile(r"^(panorama|m-\d+)", re.I)
+_PANORAMA_FILE = re.compile(r"techsupport_(panorama|m-\d+)", re.I)
+_PANORAMA_MODES = {"panorama", "logger", "management-only", "panorama-only"}
+
+
+def panorama_reason(system: dict, filename: str | None = None) -> str | None:
+    """Why this TSF comes from Panorama (M-series appliance or Panorama VM), else None.
+
+    Only `show system info` fields and the techsupport file name are used: a firewall's TSF
+    mentions Panorama in its config too (it is managed by one), which says nothing here.
+    """
+    model = str(system.get("model") or "").strip()
+    mode = str(system.get("system-mode") or "").strip().lower()
+    if model and _PANORAMA_MODEL.match(model):
+        return f"model {model}"
+    if mode in _PANORAMA_MODES:
+        return f"system mode {mode}"
+    if not model and filename and _PANORAMA_FILE.search(filename):
+        return f"file name {filename}"
+    return None
 
 
 def parse_session_info(body: str) -> dict:

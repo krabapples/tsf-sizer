@@ -59,78 +59,8 @@
     <section class="card stack">
       <div class="section-title"><span class="icon-bubble">{{ icon('sliders') }}</span><h2>Options</h2></div>
 
-      <fieldset class="field" style="border:0;padding:0;margin:0">
-        <legend class="label" style="margin-bottom:6px">Port rule</legend>
-        <div class="segmented">
-          <label><input type="radio" name="port_rule" value="all" checked>Full port layout</label>
-          <label><input type="radio" name="port_rule" value="used">Ports in use</label>
-        </div>
-        <p class="hint">Full layout: the new model offers at least every port type of the current one.</p>
-      </fieldset>
-
-      {% if superseded %}
-      <label class="switch-row" for="include_superseded">
-        <span class="text">
-          <strong>Include previous-generation models</strong>
-          <span class="hint">{% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %}. Off: only the current generation is recommended.</span>
-        </span>
-        <span class="switch"><input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch"><span class="track"></span></span>
-      </label>
-      {% endif %}
-
-      {% if llm.enabled %}
-      <label class="switch-row" for="ai_summary">
-        <span class="text">
-          <strong>Write an AI summary</strong>
-          <span class="hint">{{ llm.label }}{% if llm.provider == 'ollama' %} (local){% endif %}. Only computed figures are sent, never the TSF. <a href="/settings">Settings</a></span>
-        </span>
-        <span class="switch"><input id="ai_summary" name="ai_summary" type="checkbox" value="1" role="switch" checked><span class="track"></span></span>
-      </label>
-      {% endif %}
-
-      <label class="switch-row" for="need_poe">
-        <span class="text">
-          <strong>Customer needs PoE</strong>
-          <span class="hint">Off: dedicated PoE models (e.g. PA-545-POE) are not recommended. On: only models with PoE ports qualify. Switched on automatically when the current firewall powers PoE devices.</span>
-        </span>
-        <span class="switch"><input id="need_poe" name="need_poe" type="checkbox" value="1" role="switch"><span class="track"></span></span>
-      </label>
-
-      <details class="disclosure">
-        <summary><span>Sizing assumptions and known peaks</span>{{ icon('chevron-down', 'icon chev') }}</summary>
-        <div class="body grid-2" style="gap:14px">
-          <div class="field">
-            <label for="growth_pct">Growth per year</label>
-            <div class="input-suffix"><input id="growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}"><span>%</span></div>
-          </div>
-          <div class="field">
-            <label for="years">Planning horizon</label>
-            <div class="input-suffix"><input id="years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}"><span>years</span></div>
-          </div>
-          <div class="field">
-            <label for="target_util_pct">Target utilization</label>
-            <div class="input-suffix"><input id="target_util_pct" name="target_util_pct" type="number" min="10" max="100" step="5" value="{{ defaults.target_util_pct|int }}"><span>%</span></div>
-          </div>
-          <div class="field">
-            <label for="max_size_factor">Maximum size</label>
-            <div class="input-suffix"><input id="max_size_factor" name="max_size_factor" type="number" min="0" max="100" step="0.5" value="{{ defaults.max_size_factor|num }}"><span>× perf</span></div>
-          </div>
-          <p class="hint" style="grid-column:1/-1">Models above the maximum size (× the current throughput) are "too large". 0 = no limit.</p>
-          <div class="field">
-            <label for="peak_throughput_mbps">Known peak throughput</label>
-            <div class="input-suffix"><input id="peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring"><span>Mbps</span></div>
-          </div>
-          <div class="field">
-            <label for="peak_cps">Known peak connections</label>
-            <div class="input-suffix"><input id="peak_cps" name="peak_cps" type="text" inputmode="numeric"><span>/s</span></div>
-          </div>
-          <div class="field">
-            <label for="peak_sessions">Known peak sessions</label>
-            <input id="peak_sessions" name="peak_sessions" type="text" inputmode="numeric">
-          </div>
-          <p class="hint" style="grid-column:1/-1">The TSF only has a throughput snapshot; a known peak gives a far better result.</p>
-        </div>
-      </details>
+      {% set opts = defaults %}{% set ai_checked = true %}{% set open_assumptions = false %}
+      {% include "_options.html" %}
     </section>
   </aside>
 </form>

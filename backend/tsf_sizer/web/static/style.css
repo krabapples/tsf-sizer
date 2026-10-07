@@ -494,3 +494,14 @@ details.more > summary::-webkit-details-marker { display: none; }
   a { color: inherit; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Re-run panel on the report page */
+.rerun { padding: 0; margin: 0 0 18px; }
+.rerun > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 14px; padding: 16px 20px; }
+.rerun > summary::-webkit-details-marker { display: none; }
+.rerun-title { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.rerun-title .muted { overflow-wrap: anywhere; }
+.rerun[open] > summary { border-bottom: 1px solid var(--border); }
+.rerun[open] > summary .btn { visibility: hidden; }
+.rerun-form { padding: 18px 20px 22px; }
+@media (max-width: 720px) { .rerun > summary { flex-wrap: wrap; } }

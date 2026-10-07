@@ -30,6 +30,10 @@ class TsfFormatError(ValueError):
     pass
 
 
+class PanoramaTsfError(TsfFormatError):
+    """The TSF was generated on a Panorama management server, not on a firewall."""
+
+
 @dataclass
 class TsfFiles:
     source: str
