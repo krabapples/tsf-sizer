@@ -20,6 +20,7 @@ from .mapping import (
     slug,
 )
 from .models import expand_headers, npi_sets, sheet_lifecycle
+from .supplements import apply_supplements
 from .workbook import AttributeRow, read_workbook
 
 # How many example cells to list per review category in the report.
@@ -380,6 +381,9 @@ def import_workbook(
 
         _import_interfaces(conn, doc_id, wb.rows, specs, model_ids, report)
         _import_tsf_map(conn, doc_id, attr_by_name, report)
+        supplemented = apply_supplements(conn, doc_id)
+        if supplemented:
+            report.models["datasheet supplement (not quotable)"] = supplemented
         report.diff = _diff_previous(conn, doc_id, wb.sheet_name, wb.release)
 
         if activate or (existing and existing[1]):

@@ -125,6 +125,10 @@ Team knowledge the workbook doesn't contain is set per family on the Portfolio p
 
 The same is available on the command line inside the container: `docker exec tsf-sizer tsf-sizer set-family PA-5400 --superseded-by PA-5500`.
 
+### Models that are not in the workbook (PA-800)
+
+The workbook only covers current platforms. The **PA-820** and **PA-850** are built in from the PA-800 Series datasheet (PAN-OS 11.0): performance, sessions, new sessions per second, dedicated HA ports and the port layout. They are added to every imported workbook version (and to existing ones at start-up) and are **never recommended**; they exist so a TSF from such a firewall can be compared with its own limits. The datasheet has no rule, object, zone or routing limits, so those are not checked and the report says so. The PA-850 also exists with 4 SFP + 4 SFP+ ports instead of 8 SFP; the 8 SFP layout is stored. If a workbook ever includes one of these models, the workbook's values are used. The definitions live in `backend/tsf_sizer/portfolio/supplements.py`.
+
 **The TSF only has a throughput/CPS snapshot**: enter the customer's known peaks for a reliable performance sizing. The report is a draft for the engineer to review.
 
 ## Privacy

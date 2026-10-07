@@ -41,6 +41,7 @@ from ..llm.writeup import SYSTEM_PROMPT, build_facts
 from ..pipeline import regenerate_writeup, rerun_job, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
+from ..portfolio.supplements import apply_to_all_documents
 from ..sizing.engine import SizingParams
 from . import report as report_view
 
@@ -74,6 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         conn.execute(
             "UPDATE analysis SET status='done' WHERE status='writing' AND result_json IS NOT NULL"
         )
+        # Static datasheet models (PA-800) for versions imported before they existed.
+        apply_to_all_documents(conn)
 
     app = FastAPI(title="TSF Sizer", docs_url=None, redoc_url=None)
     app.state.settings = settings

@@ -493,6 +493,19 @@ def size(
             "with PoE ports are considered."
         )
 
+    cur = conn.execute(
+        "SELECT m.sheet_column, o.notes FROM model m LEFT JOIN model_override o "
+        "ON o.model_name = m.name WHERE m.name = ?",
+        (current,),
+    ).fetchone()
+    if cur and cur[0] == "supplement":
+        result.notes.append(
+            f"{current} is not in the capacity workbook; its figures come from the vendor "
+            "datasheet, which only has performance, sessions and ports. Rule, object, zone, "
+            "routing and other limits of the current model are unknown, so the replacement is "
+            "not checked against them: compare them by hand before quoting."
+            + (f" {cur[1]}" if cur[1] else "")
+        )
     superseded = catalog.superseded_families(conn)
     thr_req = next((r for r in reqs if r.metric.startswith("perf.throughput")), None)
     size_cap = None
