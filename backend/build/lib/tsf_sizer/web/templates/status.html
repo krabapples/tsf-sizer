@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Analysis {{ a.id }} · TSF Sizer{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis #{{ a.id }}</p>
+    <h1>{{ ('Panorama file, not a firewall' if a.error.startswith('PanoramaTsfError') else 'The analysis failed') if a.status == 'error' else ('Writing the summary…' if a.status == 'writing' else ('Sizing again…' if a.result_json else 'Analyzing the TSF…')) }}</h1>
+    <p>{{ a.filename }}{% if a.customer %} · {{ a.customer }}{% endif %}</p>
+  </div>
+</header>
+
+{% if a.status == 'error' %}
+{% if a.error.startswith('PanoramaTsfError') %}
+<div class="callout callout-error" role="alert">
+  {{ icon('x-circle') }}
+  <div>
+    <strong>This is a Panorama Tech Support File, not a firewall.</strong>
+    <p>{{ a.error.split(': ', 1)[1] }}</p>
+    <p><a href="/">Upload a firewall TSF instead</a>.</p>
+  </div>
+</div>
+{% else %}
+<div class="callout callout-error" role="alert">
+  {{ icon('x-circle') }}
+  <div>
+    <strong>The analysis failed.</strong>
+    <p>{{ a.error }}</p>
+    <p>Check that the file is a Tech Support File from a PAN-OS firewall (or the <code>techsupport_*.txt</code> from it), then <a href="/">try again</a>.</p>
+  </div>
+</div>
+{% endif %}
+<form method="post" action="/analyses/{{ a.id }}/delete"><button class="btn" type="submit">{{ icon('trash') }}<span>Delete this entry</span></button></form>
+{% else %}
+<section class="card progress" role="status" aria-live="polite">
+  <div class="stepper">
+    <div class="step done"><span class="bullet">{{ icon('check', 'icon-sm') }}</span>Upload received</div>
+    {% if a.status == 'writing' %}
+    <div class="step done"><span class="bullet">{{ icon('check', 'icon-sm') }}</span>TSF read and sized against the portfolio</div>
+    <div class="step active"><span class="bullet"><span class="spinner"></span></span><span id="status-text">Writing the AI summary…</span></div>
+    {% elif a.result_json %}
+    <div class="step done"><span class="bullet">{{ icon('check', 'icon-sm') }}</span>Figures from the TSF reused (no upload needed)</div>
+    <div class="step active"><span class="bullet"><span class="spinner"></span></span><span id="status-text">Sizing against the active portfolio…</span></div>
+    {% else %}
+    <div class="step active" id="step-read"><span class="bullet"><span class="spinner"></span></span><span id="status-text">{{ 'Waiting to start…' if a.status == 'queued' else 'Reading CLI output, config and ports…' }}</span></div>
+    <div class="step"><span class="bullet">{{ icon('gauge', 'icon-sm') }}</span>Sizing against the portfolio</div>
+    <div class="step"><span class="bullet">{{ icon('cpu', 'icon-sm') }}</span>AI summary (if configured)</div>
+    {% endif %}
+  </div>
+  <p class="muted small">This page updates by itself. Large TSFs take up to a minute.</p>
+</section>
+<noscript><meta http-equiv="refresh" content="3"></noscript>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if a.status == 'writing' %}<script>document.body.dataset.writing = '1';</script>{% endif %}
+{% if a.result_json %}<script>document.body.dataset.rerun = '1';</script>{% endif %}
+{% if a.status != 'error' %}
+<script>
+  (function poll() {
+    fetch('/api/analyses/{{ a.id }}').then(function (r) { return r.json(); }).then(function (d) {
+      if (d.status === 'done' || d.status === 'error') { location.reload(); return; }
+      if (d.status === 'writing' && !document.body.dataset.writing) { location.reload(); return; }
+      document.getElementById('status-text').textContent =
+        d.status === 'queued' ? 'Waiting to start…'
+          : d.status === 'writing' ? 'Writing the AI summary… local models can take a minute.'
+          : document.body.dataset.rerun ? 'Sizing against the active portfolio…' : 'Reading CLI output, config and ports…';
+      setTimeout(poll, 1200);
+    }).catch(function () { setTimeout(poll, 3000); });
+  })();
+</script>
+{% endif %}
+{% endblock %}

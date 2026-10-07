@@ -1,0 +1,2533 @@
+{
+ "models": {
+  "PA-3220": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "10G_SFP+": 4,
+    "1G_RJ45": 12,
+    "1G_SFP": 4
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 30000.0,
+     "raw": "30000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 512.0,
+     "raw": "512"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 2048.0,
+     "raw": "2048"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 11.0,
+     "raw": "11"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 4096.0,
+     "raw": "4096"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 150.0,
+     "raw": "150"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 1.0,
+     "raw": "1"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 150.0,
+     "raw": "150"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 25000.0,
+     "raw": "25000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 200.0,
+     "raw": "200"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 10.0,
+     "raw": "10"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 10.0,
+     "raw": "10"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 200.0,
+     "raw": "200"
+    },
+    "feature.gtp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 1048576.0,
+     "raw": "1048576"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 200000.0,
+     "raw": "200000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 1000000.0,
+     "raw": "1M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 50000.0,
+     "raw": "50000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 12000.0,
+     "raw": "12000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    }
+   }
+  },
+  "PA-3250": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "10G_SFP+": 8,
+    "1G_RJ45": 12
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 30000.0,
+     "raw": "30000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 512.0,
+     "raw": "512"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 2048.0,
+     "raw": "2048"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 11.0,
+     "raw": "11"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 4096.0,
+     "raw": "4096"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 375.0,
+     "raw": "375"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 1.0,
+     "raw": "1"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 300.0,
+     "raw": "300"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 25000.0,
+     "raw": "25000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 10.0,
+     "raw": "10"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 10.0,
+     "raw": "10"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 200.0,
+     "raw": "200"
+    },
+    "feature.gtp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 200000.0,
+     "raw": "200000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 2097152.0,
+     "raw": "2097152"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 72000.0,
+     "raw": "72000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 200000.0,
+     "raw": "200000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 1000000.0,
+     "raw": "1M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 50000.0,
+     "raw": "50000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 2048.0,
+     "raw": "2048"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 44000.0,
+     "raw": "44000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 44000.0,
+     "raw": "44000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    }
+   }
+  },
+  "PA-3260": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "10G_SFP+": 8,
+    "1G_RJ45": 12,
+    "40G_QSFP+": 4
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 30000.0,
+     "raw": "30000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 512.0,
+     "raw": "512"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 2048.0,
+     "raw": "2048"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 11.0,
+     "raw": "11"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 4096.0,
+     "raw": "4096"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 375.0,
+     "raw": "375"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 1.0,
+     "raw": "1"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 500.0,
+     "raw": "500"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 25000.0,
+     "raw": "25000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 10.0,
+     "raw": "10"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 200.0,
+     "raw": "200"
+    },
+    "feature.gtp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 300000.0,
+     "raw": "300000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 3145728.0,
+     "raw": "3145728"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 72000.0,
+     "raw": "72000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 200000.0,
+     "raw": "200000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 1000000.0,
+     "raw": "1M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 50000.0,
+     "raw": "50000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 2048.0,
+     "raw": "2048"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 44000.0,
+     "raw": "44000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 44000.0,
+     "raw": "44000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    }
+   }
+  },
+  "PA-5220": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "10G_RJ45": 4,
+    "10G_SFP+": 16,
+    "40G_QSFP+": 4
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 40000.0,
+     "raw": "40000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 80000.0,
+     "raw": "80000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 3500.0,
+     "raw": "3500"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 3500.0,
+     "raw": "3500"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 6144.0,
+     "raw": "6144"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 131.0,
+     "raw": "131"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 4096.0,
+     "raw": "4096"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 750.0,
+     "raw": "750"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 30000.0,
+     "raw": "30000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 4.0,
+     "raw": "4"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 600.0,
+     "raw": "600"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 20.0,
+     "raw": "20"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 20.0,
+     "raw": "20"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "feature.gtp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 400000.0,
+     "raw": "400000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 4194304.0,
+     "raw": "4194304"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 500000.0,
+     "raw": "500000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 4000000.0,
+     "raw": "4M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 150000.0,
+     "raw": "150000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 250000.0,
+     "raw": "250000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 512000.0,
+     "raw": "512000"
+    }
+   }
+  },
+  "PA-5250": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "100G_QSFP28": 4,
+    "10G_RJ45": 4,
+    "10G_SFP+": 16
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 80000.0,
+     "raw": "80000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 160000.0,
+     "raw": "160000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 5000.0,
+     "raw": "5000"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 6144.0,
+     "raw": "6144"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 131.0,
+     "raw": "131"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 12000.0,
+     "raw": "12000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 4096.0,
+     "raw": "4096"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 750.0,
+     "raw": "750"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 65000.0,
+     "raw": "65000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 12000.0,
+     "raw": "12000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 8.0,
+     "raw": "8"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 1200.0,
+     "raw": "1200"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 8500.0,
+     "raw": "8500"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 125.0,
+     "raw": "125"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 125.0,
+     "raw": "125"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 17000.0,
+     "raw": "17000"
+    },
+    "feature.gtp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 800000.0,
+     "raw": "800000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 8388608.0,
+     "raw": "8388608"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 500000.0,
+     "raw": "500000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 4000000.0,
+     "raw": "4M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 150000.0,
+     "raw": "150000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 250000.0,
+     "raw": "250000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 30000.0,
+     "raw": "30000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 512000.0,
+     "raw": "512000"
+    }
+   }
+  },
+  "PA-5260": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "100G_QSFP28": 4,
+    "10G_RJ45": 4,
+    "10G_SFP+": 16
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 80000.0,
+     "raw": "80000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 160000.0,
+     "raw": "160000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 5000.0,
+     "raw": "5000"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 6144.0,
+     "raw": "6144"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 131.0,
+     "raw": "131"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 5120.0,
+     "raw": "5120"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 750.0,
+     "raw": "750"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 65000.0,
+     "raw": "65000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 12000.0,
+     "raw": "12000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 8.0,
+     "raw": "8"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 8500.0,
+     "raw": "8500"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 225.0,
+     "raw": "225"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 225.0,
+     "raw": "225"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 17000.0,
+     "raw": "17000"
+    },
+    "feature.gtp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 3200000.0,
+     "raw": "3200000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 33000000.0,
+     "raw": "33000000"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 500000.0,
+     "raw": "500000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 4000000.0,
+     "raw": "4M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 150000.0,
+     "raw": "150000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 250000.0,
+     "raw": "250000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 60000.0,
+     "raw": "60000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 512000.0,
+     "raw": "512000"
+    }
+   }
+  },
+  "PA-5280": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "100G_QSFP28": 4,
+    "10G_RJ45": 4,
+    "10G_SFP+": 16
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 80000.0,
+     "raw": "80000"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 160000.0,
+     "raw": "160000"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 16.0,
+     "raw": "16"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.bfd_sessions": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 5000.0,
+     "raw": "5000"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 6144.0,
+     "raw": "6144"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 131.0,
+     "raw": "131"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 15000.0,
+     "raw": "15000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 5120.0,
+     "raw": "5120"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 8000.0,
+     "raw": "8000"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 16000.0,
+     "raw": "16000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 4000.0,
+     "raw": "4000"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 750.0,
+     "raw": "750"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 65000.0,
+     "raw": "65000"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 6000.0,
+     "raw": "6000"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 12000.0,
+     "raw": "12000"
+    },
+    "config.shared_gateways": {
+     "kind": "number",
+     "num": 8.0,
+     "raw": "8"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 8500.0,
+     "raw": "8500"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 225.0,
+     "raw": "225"
+    },
+    "config.vsys": {
+     "kind": "number",
+     "num": 225.0,
+     "raw": "225"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 17000.0,
+     "raw": "17000"
+    },
+    "feature.gtp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.sctp": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 6400000.0,
+     "raw": "6400000"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 64000000.0,
+     "raw": "64000000"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 500000.0,
+     "raw": "500000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 4000000.0,
+     "raw": "4M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 150000.0,
+     "raw": "150000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 250000.0,
+     "raw": "250000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 60000.0,
+     "raw": "60000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 512000.0,
+     "raw": "512000"
+    }
+   }
+  },
+  "PA-820": {
+   "dedicated_ha": true,
+   "port_variants": [],
+   "ports": {
+    "1G_RJ45": 4,
+    "1G_SFP": 8
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.bfd_sessions": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 400.0,
+     "raw": "400"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.shared_gateways": {
+     "kind": "special",
+     "raw": "N/A",
+     "special": "not_applicable"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 75.0,
+     "raw": "75"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 25000.0,
+     "raw": "25000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 5.0,
+     "raw": "5"
+    },
+    "config.vsys": {
+     "kind": "special",
+     "raw": "N/A",
+     "special": "not_applicable"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "feature.gtp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.sctp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 12800.0,
+     "raw": "12800"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 131072.0,
+     "raw": "131072"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 1000000.0,
+     "raw": "1M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 50000.0,
+     "raw": "50000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 5000.0,
+     "raw": "5000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    }
+   }
+  },
+  "PA-850": {
+   "dedicated_ha": true,
+   "port_variants": [
+    "alternative: 4 SFP + 4 SFP+ instead of 8 SFP"
+   ],
+   "ports": {
+    "1G_RJ45": 4,
+    "1G_SFP": 8
+   },
+   "values": {
+    "config.address_groups": {
+     "kind": "number",
+     "num": 350.0,
+     "raw": "350"
+    },
+    "config.address_objects": {
+     "kind": "number",
+     "num": 3500.0,
+     "raw": "3500"
+    },
+    "config.aggregate_interfaces": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.app_override_rules": {
+     "kind": "number",
+     "num": 150.0,
+     "raw": "150"
+    },
+    "config.auth_rules": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.bfd_sessions": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "config.custom_apps": {
+     "kind": "number",
+     "num": 6416.0,
+     "raw": "6416"
+    },
+    "config.custom_url_categories": {
+     "kind": "number",
+     "num": 2849.0,
+     "raw": "2849"
+    },
+    "config.decryption_rules": {
+     "kind": "number",
+     "num": 150.0,
+     "raw": "150"
+    },
+    "config.dos_rules": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.edl_lists": {
+     "kind": "number",
+     "num": 30.0,
+     "raw": "30"
+    },
+    "config.fqdn_objects": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.gp_gateways": {
+     "kind": "number",
+     "num": 12.0,
+     "raw": "12"
+    },
+    "config.ipsec_tunnels": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.logical_interfaces": {
+     "kind": "number",
+     "num": 1024.0,
+     "raw": "1024"
+    },
+    "config.max_address_group_members": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "config.nat_rules": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.nat_rules_dip": {
+     "kind": "number",
+     "num": 2000.0,
+     "raw": "2000"
+    },
+    "config.nat_rules_dipp": {
+     "kind": "number",
+     "num": 400.0,
+     "raw": "400"
+    },
+    "config.nat_rules_static": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "config.pbf_rules": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.qos_rules": {
+     "kind": "number",
+     "num": 500.0,
+     "raw": "500"
+    },
+    "config.schedules": {
+     "kind": "number",
+     "num": 256.0,
+     "raw": "256"
+    },
+    "config.security_profiles": {
+     "kind": "number",
+     "num": 150.0,
+     "raw": "150"
+    },
+    "config.security_rules": {
+     "kind": "number",
+     "num": 1500.0,
+     "raw": "1500"
+    },
+    "config.service_groups": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.service_objects": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.shared_gateways": {
+     "kind": "special",
+     "raw": "N/A",
+     "special": "not_applicable"
+    },
+    "config.ssl_inbound_certs": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.ts_agents": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.tunnel_inspection_rules": {
+     "kind": "number",
+     "num": 250.0,
+     "raw": "250"
+    },
+    "config.url_list_entries": {
+     "kind": "number",
+     "num": 25000.0,
+     "raw": "25000"
+    },
+    "config.userid_agents": {
+     "kind": "number",
+     "num": 100.0,
+     "raw": "100"
+    },
+    "config.userid_groups": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "config.virtual_routers": {
+     "kind": "number",
+     "num": 5.0,
+     "raw": "5"
+    },
+    "config.vsys": {
+     "kind": "special",
+     "raw": "N/A",
+     "special": "not_applicable"
+    },
+    "config.vwires": {
+     "kind": "number",
+     "num": 6.0,
+     "raw": "6"
+    },
+    "config.zones": {
+     "kind": "number",
+     "num": 40.0,
+     "raw": "40"
+    },
+    "feature.gtp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.ha_active_active": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.ha_active_passive": {
+     "bool": true,
+     "kind": "bool",
+     "raw": "Yes"
+    },
+    "feature.hsm": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "feature.sctp": {
+     "bool": false,
+     "kind": "bool",
+     "raw": "No"
+    },
+    "perf.decrypt_sessions": {
+     "kind": "number",
+     "num": 19200.0,
+     "raw": "19200"
+    },
+    "perf.sessions": {
+     "kind": "number",
+     "num": 196608.0,
+     "raw": "196608"
+    },
+    "state.arp_entries": {
+     "kind": "number",
+     "num": 3000.0,
+     "raw": "3000"
+    },
+    "state.dag_ips": {
+     "kind": "number",
+     "num": 2500.0,
+     "raw": "2500"
+    },
+    "state.edl_domains": {
+     "kind": "number",
+     "num": 1000000.0,
+     "raw": "1M"
+    },
+    "state.edl_ips": {
+     "kind": "number",
+     "num": 50000.0,
+     "raw": "50000"
+    },
+    "state.edl_urls": {
+     "kind": "number",
+     "num": 100000.0,
+     "raw": "100000"
+    },
+    "state.gp_users": {
+     "kind": "number",
+     "num": 1000.0,
+     "raw": "1000"
+    },
+    "state.routes_v4": {
+     "kind": "number",
+     "num": 10000.0,
+     "raw": "10000"
+    },
+    "state.routes_v6": {
+     "kind": "number",
+     "num": 5000.0,
+     "raw": "5000"
+    },
+    "state.userid_mappings": {
+     "kind": "number",
+     "num": 128000.0,
+     "raw": "128000"
+    }
+   }
+  }
+ },
+ "source": "older capacity workbook, PAN-OS 11.0 (static)"
+}

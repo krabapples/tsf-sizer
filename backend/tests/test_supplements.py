@@ -187,3 +187,54 @@ def test_families_are_not_quotable(conn, workbook):
     import_workbook(conn, workbook, activate=True)
     rows = dict(conn.execute("SELECT family, quotable FROM family_setting").fetchall())
     assert rows["PA-800"] == rows["PA-3200"] == rows["PA-5200"] == 0
+
+
+def _named(result):
+    s = result["sizing"]
+    return {
+        c["model"]
+        for c in [s["recommended"], *s["alternatives"], *s["rejected"], *s["too_large"]]
+        if c
+    }
+
+
+def test_models_without_data_in_the_document_are_never_candidates(conn, workbook, tmp_path):
+    """The model list is global: a model that only an older workbook had must not be
+    considered (with no data every check would 'pass')."""
+    import_workbook(conn, workbook, activate=True)
+    with conn:
+        conn.execute(
+            "INSERT INTO model (name, family, kind, sheet_lifecycle, sheet_column) "
+            "VALUES ('PA-9999', 'PA-9900', 'appliance', 'current', 'X')"
+        )
+    tsf = tmp_path / "techsupport_x.txt"
+    tsf.write_text(TECHSUPPORT.read_text())
+    r = pipeline.analyze(conn, tsf, SizingParams(), Path(CONFIG))
+    assert "PA-9999" not in _named(r)
+
+
+def test_end_of_sale_models_are_not_quotable_whatever_the_family_says(conn, workbook):
+    import_workbook(conn, workbook, activate=True)
+    with conn:  # someone switched the whole family on, and the model override is gone
+        conn.execute("UPDATE family_setting SET quotable=1 WHERE family='PA-800'")
+        conn.execute("UPDATE model_override SET customer_quotable=NULL")
+    rows = {m["name"]: m["customer_quotable"] for m in catalog.list_models(conn)}
+    assert rows["PA-850"] == 0 and rows["PA-3260"] == 0 and rows["PA-5280"] == 0
+    with conn:  # an explicit decision on the model itself still wins
+        conn.execute("UPDATE model_override SET customer_quotable=1 WHERE model_name='PA-850'")
+    assert {m["name"]: m["customer_quotable"] for m in catalog.list_models(conn)}["PA-850"] == 1
+
+
+def test_start_up_repairs_a_database_written_by_an_older_version(conn, workbook):
+    report = import_workbook(conn, workbook, activate=True)
+    with conn:  # what an older app version left behind
+        conn.execute("DELETE FROM model_override")
+        conn.execute("DELETE FROM family_setting WHERE family IN ('PA-800','PA-3200','PA-5200')")
+    stale = {m["name"]: m["customer_quotable"] for m in catalog.list_models(conn)}
+    assert stale["PA-820"] == 1  # as the older version left it: recommendable
+    apply_to_all_documents(conn)
+    assert {m["name"]: m["customer_quotable"] for m in catalog.list_models(conn)}["PA-820"] == 0
+    assert conn.execute(
+        "SELECT lifecycle, customer_quotable FROM model_override WHERE model_name='PA-820'"
+    ).fetchone()[:] == ("eol", 0)
+    assert report.document_id

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Analyses · TSF Sizer{% endblock %}
+{% block content %}
+<header class="page-head reveal">
+  <div>
+    <p class="eyebrow">New analysis</p>
+    <h1>Size a replacement firewall</h1>
+    <p>Drop a Tech Support File: the tool reads usage, config and ports, and picks the right model from the current portfolio.</p>
+  </div>
+  {% if portfolio %}
+  <a class="chip chip-good" href="/portfolio" title="Active capacity workbook">{{ icon('database', 'icon-sm') }} {{ portfolio.filename }} · PAN-OS {{ portfolio.panos_release }}</a>
+  {% endif %}
+</header>
+
+{% if not portfolio %}
+<div class="callout callout-warn reveal" role="alert">
+  {{ icon('alert') }}
+  <div><strong>No portfolio loaded.</strong> <p>Import the Features &amp; Capacities workbook on the <a href="/portfolio">Portfolio page</a> first; without it the report can't recommend a model.</p></div>
+</div>
+{% endif %}
+
+<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="split">
+  <section class="card hero-upload reveal" aria-labelledby="upload-h">
+    <div class="steps" aria-hidden="true"><span><b>1</b> Upload TSF</span><span><b>2</b> Tune assumptions</span><span><b>3</b> Get the report</span></div>
+    <h2 id="upload-h" class="sr-only">Upload</h2>
+
+    <label class="dropzone" for="tsf">
+      <span class="icon-bubble">{{ icon('upload', 'icon-lg') }}</span>
+      <strong data-title>Drop the Tech Support File here, or <span class="browse">browse</span></strong>
+      <span class="hint" data-sub>The .tgz exported from the firewall (up to {{ max_mb }} MB), or the <code>techsupport_*.txt</code> from inside it</span>
+      <input id="tsf" name="tsf" type="file" required accept=".tgz,.gz,.tar,.txt" aria-describedby="tsf-help">
+    </label>
+    <p id="tsf-help" class="hint">Only the CLI output and config are read; logs are skipped and the upload is deleted as soon as the report is ready.</p>
+
+    <label class="dropzone dropzone-sm" for="config">
+      <span class="icon-bubble">{{ icon('code') }}</span>
+      <span>
+        <strong data-title>Config XML <span class="opt">optional</span></strong>
+        <span class="hint" data-sub>Only when you upload the .txt alone. Use <code>.merged-running-config.xml</code> for Panorama-managed firewalls.</span>
+      </span>
+      <input id="config" name="config" type="file" accept=".xml">
+    </label>
+
+    <div class="field">
+      <label for="customer">Customer / opportunity <span class="opt">optional</span></label>
+      <input id="customer" name="customer" type="text" maxlength="200" autocomplete="off" placeholder="e.g. ACME – branch refresh">
+    </div>
+
+    <div>
+      <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+        {{ icon('sparkles') }}<span>Upload and analyze</span>
+      </button>
+      <span class="muted small" id="upload-status" aria-live="polite" style="margin-left:10px"></span>
+    </div>
+  </section>
+
+  <aside class="stack reveal" aria-label="Sizing options">
+    <section class="card stack">
+      <div class="section-title"><span class="icon-bubble">{{ icon('sliders') }}</span><h2>Options</h2></div>
+
+      {% set opts = defaults %}{% set ai_checked = true %}{% set open_assumptions = false %}
+      {% include "_options.html" %}
+    </section>
+  </aside>
+</form>
+
+<section class="card reveal" aria-labelledby="hist-h" id="history">
+  <div class="card-head">
+    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('history') }}</span><div><h2 id="hist-h">Recent analyses</h2><p class="muted small">Newest first</p></div></div>
+  </div>
+  {% if history %}
+  <div class="runs">
+    {% for h in history %}
+    <a class="run" href="/analyses/{{ h.id }}">
+      <span class="run-id">#{{ h.id }}</span>
+      <span class="run-main">
+        <strong>{{ h.customer or h.filename }}</strong>
+        <span>{% if h.customer %}{{ h.filename }} · {% endif %}{{ h.created_at }} UTC</span>
+      </span>
+      {% if h.model %}
+      <span class="path">{{ h.model }} {{ icon('arrow-right', 'icon-sm') }} <span class="to">{{ h.recommended or '–' }}</span></span>
+      {% else %}<span></span>{% endif %}
+      {% if h.status == 'done' %}<span class="chip chip-good"><span class="dot"></span>done</span>
+      {% elif h.status == 'error' %}<span class="chip chip-crit"><span class="dot"></span>error</span>
+      {% else %}<span class="chip chip-warn"><span class="dot"></span>{{ h.status }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">{{ icon('layers', 'icon-lg') }}<p>No analyses yet. Upload a TSF to get the first report.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
