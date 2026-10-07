@@ -151,8 +151,16 @@ def test_older_series_ports_and_limits(conn, workbook):
         or v["config.security_rules"]["num_value"] > 10000
     )
     assert v["config.security_rules"]["note"].startswith("older capacity workbook")
-    # Performance of the PA-3200 / PA-5200 is not in any source: empty, not guessed.
-    assert "perf.throughput_threat_gbps" not in v and "perf.cps" not in v
+    # PA-5200 performance comes from its datasheet (PAN-OS 11.2).
+    assert v["perf.throughput_threat_gbps"]["num_value"] == 31
+    assert v["perf.throughput_appid_gbps"]["num_value"] == 55
+    assert v["perf.cps"]["num_value"] == 500000
+    assert "PA-5200 Series datasheet" in v["perf.cps"]["note"]
+    assert _values(conn, doc, "PA-5220")["perf.throughput_threat_gbps"]["num_value"] == 8.8
+    assert _values(conn, doc, "PA-5250")["perf.cps"]["num_value"] == 368000
+    # The PA-3200 performance is not in any source yet: empty, not guessed.
+    v32 = _values(conn, doc, "PA-3260")
+    assert "perf.throughput_threat_gbps" not in v32 and "perf.cps" not in v32
     # Dedicated HA ports are stored as for any other model.
     n = conn.execute(
         """SELECT count(*) FROM capacity_value v JOIN model m ON m.id = v.model_id

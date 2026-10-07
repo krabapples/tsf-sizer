@@ -10,9 +10,9 @@ Sources:
 * supplement_data.json: limits, sessions, port layouts and HA ports of PA-820/850, PA-3220/
   3250/3260 and PA-5220/5250/5260/5280, taken once from an older capacity workbook (PAN-OS
   11.0) by tools/build_supplement.py.
-* PA-800 Series datasheet (PAN-OS 11.0): throughput and new sessions per second of the PA-820
-  and PA-850, which that workbook does not have. Throughput and connections per second of
-  the PA-3200 and PA-5200 are not known and stay empty.
+* PA-800 (PAN-OS 11.0) and PA-5200 (PAN-OS 11.2) datasheets: throughput and new sessions per
+  second, which that workbook does not have. For the PA-3200 these are not known yet and stay
+  empty.
 
 Supplement models are never recommended: their families are set to "not quotable".
 Values that are not stated stay empty ("no data"); nothing is guessed.
@@ -26,11 +26,12 @@ from dataclasses import dataclass, field
 from importlib import resources
 
 DATA_NOTE = "older capacity workbook for PAN-OS 11.0"
-DATASHEET_NOTE = "PA-800 Series datasheet (PAN-OS 11.0)"
+PA800_SHEET = "PA-800 Series datasheet (PAN-OS 11.0)"
+PA5200_SHEET = "PA-5200 Series datasheet (PAN-OS 11.2)"
 
-# PA-800 Series datasheet, Table 1 (HTTP/appmix; appmix is what the workbook rows use).
-# metric -> (raw datasheet text, value in the attribute's unit)
-DATASHEET = {
+# Datasheet Table 1 (appmix figures; appmix is what the workbook rows use).
+# model -> (source, {metric: (raw datasheet text, value in the attribute's unit)})
+_PA800 = {
     "PA-820": {
         "perf.throughput_appid_gbps": ("1.5 Gbps (appmix)", 1.5),
         "perf.throughput_threat_gbps": ("840 Mbps (appmix)", 0.84),
@@ -44,6 +45,24 @@ DATASHEET = {
         "perf.cps": ("13,100", 13100),
     },
 }
+
+
+def _pa5200(fw, threat, ipsec, cps):
+    return {
+        "perf.throughput_appid_gbps": (f"{fw:g} Gbps (appmix)", fw),
+        "perf.throughput_threat_gbps": (f"{threat:g} Gbps (appmix)", threat),
+        "perf.throughput_ipsec_gbps": (f"{ipsec:g} Gbps", ipsec),
+        "perf.cps": (f"{cps:,}", cps),
+    }
+
+
+DATASHEET = {
+    **{m: (PA800_SHEET, v) for m, v in _PA800.items()},
+    "PA-5220": (PA5200_SHEET, _pa5200(15, 8.8, 9.5, 150000)),
+    "PA-5250": (PA5200_SHEET, _pa5200(35, 19, 18.4, 368000)),
+    "PA-5260": (PA5200_SHEET, _pa5200(55, 31, 25, 500000)),
+    "PA-5280": (PA5200_SHEET, _pa5200(55, 31, 25, 500000)),
+}
 NO_PERFORMANCE = "Throughput and connections per second are not known for this model."
 MODEL_NOTES = {
     "PA-850": "End of sale. Also sold with 4 SFP + 4 SFP+ instead of 8 SFP; the 8 SFP layout "
@@ -51,10 +70,10 @@ MODEL_NOTES = {
     "PA-3220": f"End of sale. {NO_PERFORMANCE}",
     "PA-3250": f"End of sale. {NO_PERFORMANCE}",
     "PA-3260": f"End of sale. {NO_PERFORMANCE}",
-    "PA-5220": f"End of sale. {NO_PERFORMANCE}",
-    "PA-5250": f"End of sale. {NO_PERFORMANCE}",
-    "PA-5260": f"End of sale. {NO_PERFORMANCE}",
-    "PA-5280": f"End of sale. {NO_PERFORMANCE}",
+    "PA-5220": "End of sale.",
+    "PA-5250": "End of sale.",
+    "PA-5260": "End of sale.",
+    "PA-5280": "End of sale.",
 }
 FAMILY_NOTES = {
     "PA-800": "End of sale; static data. Never recommended.",
@@ -86,8 +105,9 @@ def _load() -> tuple[SupplementModel, ...]:
     out = []
     for name, d in raw["models"].items():
         values = dict(d["values"])
-        for metric, (text, num) in DATASHEET.get(name, {}).items():
-            values[metric] = {"kind": "number", "raw": text, "num": num, "datasheet": True}
+        source, sheet_values = DATASHEET.get(name, (None, {}))
+        for metric, (text, num) in sheet_values.items():
+            values[metric] = {"kind": "number", "raw": text, "num": num, "source": source}
         out.append(
             SupplementModel(
                 name=name,
@@ -180,7 +200,7 @@ def apply_supplements(conn: sqlite3.Connection, document_id: int) -> list[str]:
                     None if v.get("bool") is None else int(v["bool"]),
                     unit or v.get("unit"),
                     v.get("special"),
-                    DATASHEET_NOTE if v.get("datasheet") else DATA_NOTE,
+                    v.get("source") or DATA_NOTE,
                 ),
             )
         if m.dedicated_ha:
