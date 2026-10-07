@@ -6,7 +6,7 @@ from conftest import build_workbook
 from tsf_sizer import db
 from tsf_sizer.portfolio.importer import import_workbook
 from tsf_sizer.sizing.engine import Requirement, SizingParams, _check, fit_ports, size, variants
-from tsf_sizer.tsf.metrics import PortUse, summarize
+from tsf_sizer.tsf.metrics import Metric, PortUse, summarize
 from tsf_sizer.tsf.techsupport import parse_techsupport
 
 FIXTURE = Path(__file__).parent / "fixtures" / "techsupport_sample.txt"
@@ -266,3 +266,75 @@ def test_dedicated_poe_models_left_out_unless_needed():
     from tsf_sizer.sizing.engine import variants
 
     assert "PoE" in variants("PA-545-POE") and "PoE" not in variants("PA-1410")
+
+
+def _map(conn, metric: str, name: str, values: dict, compare_as: str = "count") -> None:
+    """The synthetic sheet lacks some rows: add an attribute, its TSF mapping and values."""
+    kind = "bool" if compare_as == "feature" else "number"
+    conn.execute(
+        "INSERT OR IGNORE INTO attribute (canonical_key, category, name, value_type) "
+        "VALUES (?, 'Extra', ?, ?)",
+        (f"extra.{metric}", name, kind),
+    )
+    attr = conn.execute("SELECT id FROM attribute WHERE canonical_key=?", (f"extra.{metric}",))
+    attr = attr.fetchone()[0]
+    conn.execute(
+        "INSERT OR REPLACE INTO tsf_metric_map VALUES (1, ?, ?, ?)", (metric, attr, compare_as)
+    )
+    for model, v in values.items():
+        mid = conn.execute("SELECT id FROM model WHERE name=?", (model,)).fetchone()[0]
+        conn.execute(
+            "INSERT OR REPLACE INTO capacity_value (document_id, model_id, attribute_id, "
+            "raw_value, kind, num_value, bool_value) VALUES (1, ?, ?, ?, ?, ?, ?)",
+            (
+                mid,
+                attr,
+                str(v),
+                kind,
+                None if kind == "bool" else v,
+                int(v) if kind == "bool" else None,
+            ),
+        )
+    conn.commit()
+
+
+def _everyone(result):
+    shown = [result.recommended, *result.alternatives, *result.rejected, *result.too_large]
+    return {c.model: c for c in shown if c}
+
+
+def test_lre_not_supported_is_a_notice_not_a_reason_to_exclude(sized_db):
+    _map(sized_db, "feature.lre_routing", "Legacy Routing Engine (LRE) Support",
+         {"PA-450R": True, "PA-3430": False}, "feature")  # fmt: skip
+    s = summary_as("PA-450R")
+    s.metrics["feature.lre_routing"] = Metric(True, "feature", "show system info")
+    result = size(sized_db, s, SizingParams(include_superseded=True, max_size_factor=0))
+    cand = _everyone(result)["PA-3430"]
+    assert result.recommended.model == "PA-3430"
+    assert not any("Legacy Routing" in f for f in cand.failures)
+    assert any(
+        "Legacy Routing Engine" in n and "Advanced Routing Engine" in n for n in cand.notices
+    )
+    assert any(n.startswith("PA-3430: The Legacy Routing Engine") for n in result.notes)
+
+
+def test_aggregate_interfaces_never_block_a_pa800_replacement(sized_db):
+    values = {"PA-850": 6, "PA-450R": 6, "PA-3430": 4}
+    _map(sized_db, "config.aggregate_interfaces", "Maximum aggregate interfaces", values)
+    params = SizingParams(include_superseded=True, max_size_factor=0, port_rule="used")
+
+    s = summary_as("PA-850", ports=[])
+    s.metrics["config.aggregate_interfaces"] = Metric(1, "count", "config")
+    cand = _everyone(size(sized_db, s, params))["PA-3430"]
+    assert not any("ggregate" in f for f in cand.failures)
+    assert any("aggregate interfaces" in n.lower() and "Not blocking" in n for n in cand.notices)
+    assert any(
+        c.status == "warn" and c.metric == "config.aggregate_interfaces" for c in cand.checks
+    )
+
+    # Any other current model: the same shortfall still excludes the candidate.
+    s = summary_as("PA-450R", ports=[])
+    s.metrics["config.aggregate_interfaces"] = Metric(1, "count", "config")
+    cand = _everyone(size(sized_db, s, params))["PA-3430"]
+    assert any("Maximum aggregate interfaces: below current model" in f for f in cand.failures)
+    assert not cand.notices

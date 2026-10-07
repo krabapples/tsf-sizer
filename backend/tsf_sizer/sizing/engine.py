@@ -5,11 +5,14 @@ Rules (the team's sizing policy):
   * every capacity must be at least the current model's; performance strictly more
   * ports: by default the candidate must offer at least the current model's full
     port layout; optionally only the ports actually in use
-  * features in use (HA mode, GTP, SCTP, ...) must be supported
+  * features in use (HA mode, GTP, SCTP, ...) must be supported, except the "soft" ones below
   * only quotable models (not NPI, not chassis components) are considered
   * previous-generation families are left out unless the user includes them
   * models far larger than needed (max_size_factor x the current performance)
     are not recommended
+
+Soft rules never exclude a model but are flagged on it (Candidate.notices, and in the notes
+of the recommended model): see SOFT_FEATURES and SOFT_LIMITS.
 """
 
 from __future__ import annotations
@@ -24,6 +27,21 @@ from ..tsf.compare import resolve_port_media
 from ..tsf.metrics import TsfSummary
 
 PERF_METRICS = ("perf.throughput", "perf.cps", "perf.sessions")
+
+# Features the current firewall uses that a newer model may drop on purpose. Not supported is
+# a notice, never a reason to leave the model out.
+SOFT_FEATURES = {
+    "feature.lre_routing": (
+        "The Legacy Routing Engine (LRE) in use today is not supported on {model}: plan the "
+        "move to the Advanced Routing Engine"
+    ),
+}
+
+# Limits that never block when replacing a model of the given family (they are still shown
+# when the candidate would have failed them): family of the current model -> metrics.
+SOFT_LIMITS = {
+    "PA-800": frozenset({"config.aggregate_interfaces"}),
+}
 
 # Per-item limits (how big one group/aggregate may be) are not object counts: they
 # only need to cover usage x growth, not the current model's figure. Without this,
@@ -111,7 +129,7 @@ class Check:
     current_capacity: float | None
     candidate_capacity: float | None
     candidate_raw: str | None
-    status: str  # pass | fail | unknown
+    status: str  # pass | fail | unknown | warn (would fail, but is a soft rule: not blocking)
     reason: str | None = None
     headroom_pct: float | None = None
     unconfirmed: bool = False
@@ -132,6 +150,7 @@ class Candidate:
     poe_ports: int = 0
     too_large: str | None = None
     unknown_features: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)  # soft rules that apply: not blocking
     sort_key: float = 0.0
 
 
@@ -522,6 +541,9 @@ def size(
     result.size_cap_gbps = size_cap
 
     candidates = []
+    fam_row = conn.execute("SELECT family FROM model WHERE name = ?", (current,)).fetchone()
+    current_family = fam_row[0] if fam_row else None
+    soft_limits = SOFT_LIMITS.get(current_family, frozenset())
     # The model list is global (every workbook ever imported adds to it): only models this
     # workbook version has data for can be compared, never "no data passes everything".
     with_data = {
@@ -546,6 +568,12 @@ def size(
         cand = Candidate(model["name"], model["family"], True)
         for req in reqs:
             chk = _check(req, caps.get(req.metric))
+            if chk.status == "fail" and req.metric in soft_limits:
+                chk.status = "warn"
+                cand.notices.append(
+                    f"{chk.label}: {chk.reason}. Not blocking when replacing a {current_family} "
+                    "firewall; check that the aggregate interfaces in use still fit"
+                )
             cand.checks.append(chk)
             if chk.status == "fail":
                 cand.failures.append(f"{chk.label}: {chk.reason}")
@@ -558,7 +586,10 @@ def size(
                 cand.unknown_features.append(fkey.removeprefix("feature.").replace("_", " "))
                 continue
             if not (cap.get("bool_value") == 1 or (cap.get("num_value") or 0) > 0):
-                cand.failures.append(f"{cap['name']}: not supported")
+                if fkey in SOFT_FEATURES:
+                    cand.notices.append(SOFT_FEATURES[fkey].format(model=model["name"]))
+                else:
+                    cand.failures.append(f"{cap['name']}: not supported")
 
         poe_ports = _poe_ports(conn, model["name"], document_id)
         if need_poe and not poe_ports:
@@ -624,6 +655,10 @@ def size(
         )
     else:
         result.notes.append("No quotable model meets every rule; see the rejected list.")
+    if result.recommended:
+        # Soft rules that apply to the recommendation: shown under "Check before quoting".
+        for n in result.recommended.notices:
+            result.notes.append(f"{result.recommended.model}: {n}")
     for fam, successor in sorted(result.excluded_families.items()):
         result.notes.append(
             f"{fam} series left out: superseded by the {successor} series. Tick 'Include "

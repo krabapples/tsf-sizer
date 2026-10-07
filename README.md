@@ -110,7 +110,8 @@ Defaults can be changed per analysis under *Sizing assumptions and known peaks*.
 - Throughput, connections/s and sessions are sized to stay under the target utilization (default 70 %), and must be **higher** than the current model's.
 - Object, rule and interface counts must be **at least** the current model's. Per-item limits (members per address group, members per aggregate) only need to cover actual usage.
 - Ports: by default at least the current model's full port layout; optionally only the ports in use. HA links on data ports are freed when the new model has dedicated HA ports.
-- Features in use (HA mode, GTP, SCTP, …) must be supported.
+- Features in use (HA mode, GTP, SCTP, …) must be supported. One exception: a newer model that no longer supports the Legacy Routing Engine is **not** excluded; it gets a *not blocking* warning to plan the move to the Advanced Routing Engine.
+- When the current firewall is a **PA-800** (PA-820/850), the *maximum aggregate interfaces* limit never excludes a replacement. If the candidate has fewer than the PA-800, the card, the requirements table and *Check before quoting* say so.
 - Unreleased (NPI) models and chassis cards are never recommended.
 - **Previous generations** (e.g. PA-400, succeeded by PA-500) are left out unless *Include previous-generation models* is ticked on the analysis form.
 - **PoE:** dedicated PoE models (e.g. PA-545-POE, PA-555-POE) are only recommended when *Customer needs PoE* is ticked; then only models with PoE ports qualify (which includes models with PoE as standard, like the PA-1400 series). It switches on automatically when the TSF shows PoE devices powered on the current firewall.

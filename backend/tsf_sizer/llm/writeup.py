@@ -23,6 +23,8 @@ Strict rules:
 - Quote numbers exactly as they appear in the JSON (you may round percentages to whole numbers).
 - Mention only models that appear in the JSON.
 - Be concrete: compare the recommended model with the current model and the requirement.
+- Every entry of not_blocking_issues of the recommended model must appear under
+  "Before quoting": those are known differences that do not exclude the model.
 - If something is uncertain (snapshot values, short history, unconfirmed capacity values),
   say so plainly.
 - English, plain Markdown, at most about 250 words. No tables, no code blocks.
@@ -71,6 +73,7 @@ def build_facts(result: dict) -> dict:
             "dedicated_ha_ports": plan.get("dedicated_ha"),
             "poe_ports": c.get("poe_ports"),
             "closest_limits": c.get("tightest", []),
+            "not_blocking_issues": c.get("notices", []),
             "relies_on_unconfirmed_values": c.get("unconfirmed_used", []),
         }
 

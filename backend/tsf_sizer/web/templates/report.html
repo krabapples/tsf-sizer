@@ -15,6 +15,7 @@
 {% macro status_badge(st, unconfirmed) -%}
 {% if st == 'pass' %}<span class="status status-ok">{{ icon('check', 'icon-sm') }}meets</span>
 {% elif st == 'fail' %}<span class="status status-crit">{{ icon('x', 'icon-sm') }}fails</span>
+{% elif st == 'warn' %}<span class="status status-warn" title="Below the current model, but this limit never blocks for this model family">{{ icon('alert', 'icon-sm') }}not blocking</span>
 {% elif st == 'unknown' %}<span class="status status-muted">no data</span>{% endif %}
 {% if unconfirmed %}<span class="status status-warn" title="Orange cell in the capacity sheet: not tested or confirmed yet">unconfirmed</span>{% endif %}
 {%- endmacro %}
@@ -123,11 +124,12 @@
         <dt>Ports</dt><dd>{{ c.ports }}</dd>
         {% if v.need_poe or c.poe_ports %}<dt>PoE ports</dt><dd>{{ c.poe_ports or 'none' }}</dd>{% endif %}
       </dl>
-      {% if c.tightest or c.unconfirmed or c.unknown_features or c.too_large %}
+      {% if c.tightest or c.unconfirmed or c.unknown_features or c.too_large or c.notices %}
       <div class="rec-notes">
         {% if c.tightest %}<p>{{ icon('gauge', 'icon-sm') }}<span><strong>Closest limits:</strong> {{ c.tightest|join('; ') }}</span></p>{% endif %}
         {% if c.too_large %}<p>{{ icon('alert', 'icon-sm') }}<span>Larger than the size cap: {{ c.too_large }}</span></p>{% endif %}
         {% if c.unconfirmed %}<p>{{ icon('alert', 'icon-sm') }}<span><span class="status status-warn">unconfirmed</span> relies on unconfirmed sheet values: {{ c.unconfirmed|join(', ') }}</span></p>{% endif %}
+        {% for n in c.notices %}<p>{{ icon('alert', 'icon-sm') }}<span><span class="status status-warn">not blocking</span> {{ n }}</span></p>{% endfor %}
         {% if c.unknown_features %}<p>{{ icon('info', 'icon-sm') }}<span>Check support for {{ c.unknown_features|join(', ') }}: not in the capacity sheet</span></p>{% endif %}
       </div>
       {% endif %}
@@ -141,7 +143,7 @@
       Every capacity ≥ usage × growth ({{ v.params.growth_pct_per_year|num }}%/year over {{ v.params.years }} years = ×{{ v.params.growth_factor|num(2) }});
       performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model;
       object, rule and interface counts at least the current model's (per-item limits such as members per address group only need to cover usage);
-      ports: {{ v.port_rule }}; features in use supported;
+      ports: {{ v.port_rule }}; features in use supported (except the Legacy Routing Engine, which only gets a warning);
       {% if v.need_poe %}PoE needed: only models with PoE ports;{% else %}PoE not needed: dedicated PoE models left out;{% endif %}
       {% if v.size_cap %}at most {{ v.params.max_size_factor|num }}× the current performance ({{ v.size_cap|num }} Gbps);{% endif %}
       {% if v.excluded_families %}previous generations left out ({% for fam, succ in v.excluded_families.items() %}{{ fam }} → {{ succ }}{% if not loop.last %}, {% endif %}{% endfor %});{% elif v.params.include_superseded %}previous generations included;{% endif %}

@@ -173,6 +173,7 @@ def build(result: dict, row: dict) -> dict:
                 "dedicated_ha": plan.get("dedicated_ha"),
                 "variants": cand.get("extra_variants", []),
                 "unknown_features": cand.get("unknown_features", []),
+                "notices": cand.get("notices", []),
                 "too_large": cand.get("too_large"),
                 "poe_ports": cand.get("poe_ports", 0),
             }
