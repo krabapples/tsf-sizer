@@ -7,7 +7,7 @@ A web tool that runs in a Docker container. Upload a PAN-OS Tech Support File (T
 You need Docker (Docker Desktop on Mac/Windows).
 
 ```bash
-git clone <this repo> tsf-sizer && cd tsf-sizer
+git clone https://github.com/krabapples/tsf-sizer.git && cd tsf-sizer
 docker compose up -d --build
 ```
 
