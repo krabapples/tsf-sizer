@@ -10,6 +10,18 @@ from tsf_sizer.portfolio.importer import import_workbook
 from tsf_sizer.portfolio.supplements import apply_supplements, apply_to_all_documents
 from tsf_sizer.sizing.engine import SizingParams
 
+ALL = [
+    "PA-820",
+    "PA-850",
+    "PA-3220",
+    "PA-3250",
+    "PA-3260",
+    "PA-5220",
+    "PA-5250",
+    "PA-5260",
+    "PA-5280",
+]
+
 
 def _values(conn, doc_id, model):
     return {
@@ -27,7 +39,7 @@ def _values(conn, doc_id, model):
 
 def test_import_adds_pa800_from_the_datasheet(conn, workbook):
     report = import_workbook(conn, workbook, activate=True)
-    assert report.models["datasheet supplement (not quotable)"] == ["PA-820", "PA-850"]
+    assert sorted(report.models["datasheet supplement (not quotable)"]) == sorted(ALL)
     v = _values(conn, report.document_id, "PA-850")
     assert v["perf.throughput_threat_gbps"]["num_value"] == 1.0
     assert v["perf.throughput_appid_gbps"]["num_value"] == 1.9
@@ -59,8 +71,10 @@ def test_apply_is_idempotent_and_reaches_older_imports(conn, workbook, tmp_path)
         "DELETE FROM capacity_value WHERE model_id IN (SELECT id FROM model WHERE family='PA-800')"
     )
     conn.commit()
-    assert apply_to_all_documents(conn) == {report.document_id: ["PA-820", "PA-850"]}
-    assert apply_supplements(conn, report.document_id) == ["PA-820", "PA-850"]
+    assert {k: sorted(v) for k, v in apply_to_all_documents(conn).items()} == {
+        report.document_id: sorted(ALL)
+    }
+    assert sorted(apply_supplements(conn, report.document_id)) == sorted(ALL)
     n = conn.execute(
         "SELECT count(*) FROM capacity_value v JOIN model m ON m.id=v.model_id "
         "WHERE m.name='PA-850'"
@@ -92,6 +106,7 @@ def test_workbook_wins_when_it_has_the_model(conn, tmp_path):
     report = import_workbook(conn, path, activate=True)
     assert "PA-850" not in report.models.get("datasheet supplement (not quotable)", [])
     assert "PA-820" in report.models["datasheet supplement (not quotable)"]
+    assert "PA-3260" in report.models["datasheet supplement (not quotable)"]
 
 
 def test_pa850_tsf_uses_the_datasheet_and_warns(conn, workbook, tmp_path):
@@ -103,7 +118,9 @@ def test_pa850_tsf_uses_the_datasheet_and_warns(conn, workbook, tmp_path):
     assert r["portfolio_error"] is None and r["usage"]["model"] == "PA-850"
     caps = {row["metric"]: row["capacity"] for row in r["usage"]["rows"]}
     assert caps.get("perf.cps_snapshot") == 13100  # the synthetic workbook has no sessions row
-    assert any("datasheet" in n and "compare them by hand" in n for n in r["sizing"]["notes"])
+    assert any(
+        "datasheet" in n and "compare those limits by hand" in n for n in r["sizing"]["notes"]
+    )
     named = [r["sizing"]["recommended"], *r["sizing"]["alternatives"], *r["sizing"]["rejected"]]
     assert not any(c and c["model"] in ("PA-820", "PA-850") for c in named)
 
@@ -113,3 +130,40 @@ def test_pa800_family_setting_default(conn, workbook, model):
     import_workbook(conn, workbook, activate=True)
     row = conn.execute("SELECT quotable FROM family_setting WHERE family='PA-800'").fetchone()
     assert row[0] == 0
+
+
+def test_older_series_ports_and_limits(conn, workbook):
+    doc = import_workbook(conn, workbook, activate=True).document_id
+    assert catalog.interface_ports(conn, "PA-3260", doc) == {
+        "1G_RJ45": 12,
+        "1G_SFP": 8,
+        "10G_SFP+": 8,
+        "40G_QSFP+": 4,
+    }
+    assert catalog.interface_ports(conn, "PA-5260", doc) == {
+        "10G_RJ45": 4,
+        "10G_SFP+": 16,
+        "100G_QSFP28": 4,
+    }
+    v = _values(conn, doc, "PA-5260")
+    assert (
+        v["config.security_rules"]["num_value"] == 20000
+        or v["config.security_rules"]["num_value"] > 10000
+    )
+    assert v["config.security_rules"]["note"].startswith("older capacity workbook")
+    # Performance of the PA-3200 / PA-5200 is not in any source: empty, not guessed.
+    assert "perf.throughput_threat_gbps" not in v and "perf.cps" not in v
+    # Dedicated HA ports are stored as for any other model.
+    n = conn.execute(
+        """SELECT count(*) FROM capacity_value v JOIN model m ON m.id = v.model_id
+           JOIN attribute a ON a.id = v.attribute_id
+           WHERE m.name = 'PA-5260' AND v.bool_value = 1 AND a.canonical_key LIKE
+             'interfaces.dedicated_ha%'"""
+    ).fetchone()[0]
+    assert n in (0, 2)
+
+
+def test_families_are_not_quotable(conn, workbook):
+    import_workbook(conn, workbook, activate=True)
+    rows = dict(conn.execute("SELECT family, quotable FROM family_setting").fetchall())
+    assert rows["PA-800"] == rows["PA-3200"] == rows["PA-5200"] == 0

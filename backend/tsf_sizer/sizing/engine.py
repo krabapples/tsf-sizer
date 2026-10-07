@@ -500,11 +500,10 @@ def size(
     ).fetchone()
     if cur and cur[0] == "supplement":
         result.notes.append(
-            f"{current} is not in the capacity workbook; its figures come from the vendor "
-            "datasheet, which only has performance, sessions and ports. Rule, object, zone, "
-            "routing and other limits of the current model are unknown, so the replacement is "
-            "not checked against them: compare them by hand before quoting."
-            + (f" {cur[1]}" if cur[1] else "")
+            f"{current} is not in the current capacity workbook; its figures come from older, "
+            "fixed sources (an older workbook and a vendor datasheet) and some may be missing. "
+            "Anything the report shows as 'no data' for the current model is not checked: "
+            "compare those limits by hand before quoting." + (f" {cur[1]}" if cur[1] else "")
         )
     superseded = catalog.superseded_families(conn)
     thr_req = next((r for r in reqs if r.metric.startswith("perf.throughput")), None)

@@ -72,10 +72,13 @@ def _is_unconfirmed(cell) -> bool:
     return isinstance(rgb, str) and rgb.upper() in UNCONFIRMED_FILLS
 
 
-def _find_capacity_sheet(wb) -> tuple[Worksheet, int]:
-    """Return the sheet and header row that has the most model-name headers."""
+def _find_capacity_sheet(wb, sheet: str | None = None) -> tuple[Worksheet, int]:
+    """Return the sheet and header row that has the most model-name headers
+    (of one given sheet, if `sheet` is set)."""
     best: tuple[Worksheet, int, int] | None = None
     for ws in wb.worksheets:
+        if sheet is not None and ws.title != sheet:
+            continue
         for r in range(1, min(ws.max_row, 10) + 1):
             n = sum(
                 1
@@ -129,10 +132,10 @@ def file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def read_workbook(path: str | Path) -> WorkbookData:
+def read_workbook(path: str | Path, sheet: str | None = None) -> WorkbookData:
     path = Path(path)
     wb = openpyxl.load_workbook(path, data_only=True)
-    ws, header_row = _find_capacity_sheet(wb)
+    ws, header_row = _find_capacity_sheet(wb, sheet)
     warnings: list[str] = []
 
     model_columns: dict[int, str] = {}

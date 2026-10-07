@@ -125,9 +125,13 @@ Team knowledge the workbook doesn't contain is set per family on the Portfolio p
 
 The same is available on the command line inside the container: `docker exec tsf-sizer tsf-sizer set-family PA-5400 --superseded-by PA-5500`.
 
-### Models that are not in the workbook (PA-800)
+### Models that are not in the workbook (PA-800, PA-3200, PA-5200)
 
-The workbook only covers current platforms. The **PA-820** and **PA-850** are built in from the PA-800 Series datasheet (PAN-OS 11.0): performance, sessions, new sessions per second, dedicated HA ports and the port layout. They are added to every imported workbook version (and to existing ones at start-up) and are **never recommended**; they exist so a TSF from such a firewall can be compared with its own limits. The datasheet has no rule, object, zone or routing limits, so those are not checked and the report says so. The PA-850 also exists with 4 SFP + 4 SFP+ ports instead of 8 SFP; the 8 SFP layout is stored. If a workbook ever includes one of these models, the workbook's values are used. The definitions live in `backend/tsf_sizer/portfolio/supplements.py`.
+The current workbook only covers current platforms. So that a TSF from an older firewall can still be compared with its own limits, these models are built in as fixed data: **PA-820, PA-850, PA-3220, PA-3250, PA-3260, PA-5220, PA-5250, PA-5260, PA-5280**. They are added to every imported workbook version (and to existing ones at start-up) and are **never recommended**. If a workbook ever includes one of these models, the workbook's values are used instead.
+
+- Limits, sessions, port layouts and dedicated HA ports come from an older capacity workbook (PAN-OS 11.0), extracted once with `backend/tools/build_supplement.py` into `backend/tsf_sizer/portfolio/supplement_data.json` (numbers and Yes/No only).
+- Throughput and new sessions per second of the PA-820/850 come from the PA-800 Series datasheet. For the PA-3200 and PA-5200 they are **not known** and stay empty: the report warns that performance is not checked and no size cap applies.
+- Where a model had two port options (PA-850: 8 SFP, or 4 SFP + 4 SFP+) the first is stored. On the PA-5200 the 16 shared SFP/SFP+ cages are stored as SFP+.
 
 **The TSF only has a throughput/CPS snapshot**: enter the customer's known peaks for a reliable performance sizing. The report is a draft for the engineer to review.
 

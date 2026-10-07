@@ -30,6 +30,7 @@ build-backend = "setuptools.build_meta"
 include = ["tsf_sizer*"]
 
 [tool.setuptools.package-data]
+"tsf_sizer.portfolio" = ["supplement_data.json"]
 "tsf_sizer.web" = ["templates/*.html", "static/*", "static/fonts/*"]
 
 [tool.pytest.ini_options]
