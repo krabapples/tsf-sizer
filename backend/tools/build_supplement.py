@@ -29,14 +29,17 @@ OUT = Path(__file__).resolve().parents[1] / "tsf_sizer" / "portfolio" / "supplem
 # Port layouts. The sheet's cells are option lists ("4/8", "0/16") that do not combine
 # mechanically, so the layouts are written out here (and agree with the PA-800 datasheet):
 #   PA-850: 4 RJ45 + 8 SFP, or 4 RJ45 + 4 SFP + 4 SFP+ (the first is stored)
+#   PA-3200: the sheet lists SFP and SFP+ in separate rows, but the datasheet has shared
+#            "1G/10G SFP/SFP+" cages: PA-3220 = 4 SFP + 4 SFP/SFP+, PA-3250 = 8 SFP/SFP+,
+#            PA-3260 = 8 SFP/SFP+ + 4 QSFP+ (stored as SFP+)
 #   PA-5200: 4 RJ45 (100M/1G/10G) + 16 cages that take SFP or SFP+ (stored as SFP+; the sizing
 #            lets SFP needs use SFP+ cages) + 4 QSFP (40G on PA-5220, 40/100G on the others)
 PORTS = {
     "PA-820": {"1G_RJ45": 4, "1G_SFP": 8},
     "PA-850": {"1G_RJ45": 4, "1G_SFP": 8},
-    "PA-3220": {"1G_RJ45": 12, "1G_SFP": 8, "10G_SFP+": 4},
-    "PA-3250": {"1G_RJ45": 12, "1G_SFP": 8, "10G_SFP+": 8},
-    "PA-3260": {"1G_RJ45": 12, "1G_SFP": 8, "10G_SFP+": 8, "40G_QSFP+": 4},
+    "PA-3220": {"1G_RJ45": 12, "1G_SFP": 4, "10G_SFP+": 4},
+    "PA-3250": {"1G_RJ45": 12, "10G_SFP+": 8},
+    "PA-3260": {"1G_RJ45": 12, "10G_SFP+": 8, "40G_QSFP+": 4},
     "PA-5220": {"10G_RJ45": 4, "10G_SFP+": 16, "40G_QSFP+": 4},
     "PA-5250": {"10G_RJ45": 4, "10G_SFP+": 16, "100G_QSFP28": 4},
     "PA-5260": {"10G_RJ45": 4, "10G_SFP+": 16, "100G_QSFP28": 4},

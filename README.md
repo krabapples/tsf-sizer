@@ -130,8 +130,8 @@ The same is available on the command line inside the container: `docker exec tsf
 The current workbook only covers current platforms. So that a TSF from an older firewall can still be compared with its own limits, these models are built in as fixed data: **PA-820, PA-850, PA-3220, PA-3250, PA-3260, PA-5220, PA-5250, PA-5260, PA-5280**. They are added to every imported workbook version (and to existing ones at start-up) and are **never recommended**. If a workbook ever includes one of these models, the workbook's values are used instead.
 
 - Limits, sessions, port layouts and dedicated HA ports come from an older capacity workbook (PAN-OS 11.0), extracted once with `backend/tools/build_supplement.py` into `backend/tsf_sizer/portfolio/supplement_data.json` (numbers and Yes/No only).
-- Throughput and new sessions per second come from the datasheets: PA-800 Series (PAN-OS 11.0) for the PA-820/850, PA-5200 Series (PAN-OS 11.2) for the PA-5220/5250/5260/5280. For the **PA-3200** they are **not known yet** and stay empty: the report warns that performance is not checked and no size cap applies.
-- Where a model had two port options (PA-850: 8 SFP, or 4 SFP + 4 SFP+) the first is stored. On the PA-5200 the 16 shared SFP/SFP+ cages are stored as SFP+.
+- Throughput, new sessions per second and max sessions come from the datasheets: PA-800 Series (PAN-OS 11.0), PA-3200 Series (11.1) and PA-5200 Series (11.2). Session counts also come from the datasheets (the older workbook's binary figures, e.g. 3,145,728 for the PA-3260, are about 5% higher than the published 2.2M).
+- Where a model had two port options (PA-850: 8 SFP, or 4 SFP + 4 SFP+) the first is stored. Shared SFP/SFP+ cages (PA-3200, PA-5200) are stored as SFP+; the sizing lets SFP needs use them.
 
 **The TSF only has a throughput/CPS snapshot**: enter the customer's known peaks for a reliable performance sizing. The report is a draft for the engineer to review.
 

@@ -7,7 +7,7 @@ from test_web import CONFIG, TECHSUPPORT
 from tsf_sizer import pipeline
 from tsf_sizer.portfolio import catalog
 from tsf_sizer.portfolio.importer import import_workbook
-from tsf_sizer.portfolio.supplements import apply_supplements, apply_to_all_documents
+from tsf_sizer.portfolio.supplements import SUPPLEMENTS, apply_supplements, apply_to_all_documents
 from tsf_sizer.sizing.engine import SizingParams
 
 ALL = [
@@ -136,9 +136,13 @@ def test_older_series_ports_and_limits(conn, workbook):
     doc = import_workbook(conn, workbook, activate=True).document_id
     assert catalog.interface_ports(conn, "PA-3260", doc) == {
         "1G_RJ45": 12,
-        "1G_SFP": 8,
         "10G_SFP+": 8,
         "40G_QSFP+": 4,
+    }
+    assert catalog.interface_ports(conn, "PA-3220", doc) == {
+        "1G_RJ45": 12,
+        "1G_SFP": 4,
+        "10G_SFP+": 4,
     }
     assert catalog.interface_ports(conn, "PA-5260", doc) == {
         "10G_RJ45": 4,
@@ -158,9 +162,17 @@ def test_older_series_ports_and_limits(conn, workbook):
     assert "PA-5200 Series datasheet" in v["perf.cps"]["note"]
     assert _values(conn, doc, "PA-5220")["perf.throughput_threat_gbps"]["num_value"] == 8.8
     assert _values(conn, doc, "PA-5250")["perf.cps"]["num_value"] == 368000
-    # The PA-3200 performance is not in any source yet: empty, not guessed.
     v32 = _values(conn, doc, "PA-3260")
-    assert "perf.throughput_threat_gbps" not in v32 and "perf.cps" not in v32
+    assert v32["perf.throughput_threat_gbps"]["num_value"] == 4
+    assert v32["perf.throughput_appid_gbps"]["num_value"] == 7.5
+    assert v32["perf.cps"]["num_value"] == 84000
+    # Sessions come from the datasheets (the synthetic workbook has no sessions row to store to).
+    by_name = {m.name: m for m in SUPPLEMENTS}
+    assert by_name["PA-3260"].values["perf.sessions"]["num"] == 2_200_000  # not 3,145,728
+    assert by_name["PA-5280"].values["perf.sessions"]["num"] == 64_000_000
+    assert by_name["PA-850"].values["perf.sessions"]["num"] == 192_000
+    assert "PA-3200 Series datasheet" in v32["perf.cps"]["note"]
+    assert _values(conn, doc, "PA-3220")["perf.throughput_threat_gbps"]["num_value"] == 2.2
     # Dedicated HA ports are stored as for any other model.
     n = conn.execute(
         """SELECT count(*) FROM capacity_value v JOIN model m ON m.id = v.model_id

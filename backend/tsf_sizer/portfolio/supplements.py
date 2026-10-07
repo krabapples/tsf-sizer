@@ -10,9 +10,8 @@ Sources:
 * supplement_data.json: limits, sessions, port layouts and HA ports of PA-820/850, PA-3220/
   3250/3260 and PA-5220/5250/5260/5280, taken once from an older capacity workbook (PAN-OS
   11.0) by tools/build_supplement.py.
-* PA-800 (PAN-OS 11.0) and PA-5200 (PAN-OS 11.2) datasheets: throughput and new sessions per
-  second, which that workbook does not have. For the PA-3200 these are not known yet and stay
-  empty.
+* PA-800 (PAN-OS 11.0), PA-3200 (11.1) and PA-5200 (11.2) datasheets: throughput and new
+  sessions per second, which that workbook does not have.
 
 Supplement models are never recommended: their families are set to "not quotable".
 Values that are not stated stay empty ("no data"); nothing is guessed.
@@ -28,6 +27,7 @@ from importlib import resources
 DATA_NOTE = "older capacity workbook for PAN-OS 11.0"
 PA800_SHEET = "PA-800 Series datasheet (PAN-OS 11.0)"
 PA5200_SHEET = "PA-5200 Series datasheet (PAN-OS 11.2)"
+PA3200_SHEET = "PA-3200 Series datasheet (PAN-OS 11.1)"
 
 # Datasheet Table 1 (appmix figures; appmix is what the workbook rows use).
 # model -> (source, {metric: (raw datasheet text, value in the attribute's unit)})
@@ -37,39 +37,47 @@ _PA800 = {
         "perf.throughput_threat_gbps": ("840 Mbps (appmix)", 0.84),
         "perf.throughput_ipsec_gbps": ("1.4 Gbps", 1.4),
         "perf.cps": ("8,100", 8100),
+        "perf.sessions": ("128,000", 128000),
     },
     "PA-850": {
         "perf.throughput_appid_gbps": ("1.9 Gbps (appmix)", 1.9),
         "perf.throughput_threat_gbps": ("1.0 Gbps (appmix)", 1.0),
         "perf.throughput_ipsec_gbps": ("1.8 Gbps", 1.8),
         "perf.cps": ("13,100", 13100),
+        "perf.sessions": ("192,000", 192000),
     },
 }
 
 
-def _pa5200(fw, threat, ipsec, cps):
+def _perf(fw, threat, ipsec, cps, sessions):
     return {
         "perf.throughput_appid_gbps": (f"{fw:g} Gbps (appmix)", fw),
         "perf.throughput_threat_gbps": (f"{threat:g} Gbps (appmix)", threat),
         "perf.throughput_ipsec_gbps": (f"{ipsec:g} Gbps", ipsec),
         "perf.cps": (f"{cps:,}", cps),
+        "perf.sessions": (f"{sessions:,}", sessions),
     }
 
 
 DATASHEET = {
     **{m: (PA800_SHEET, v) for m, v in _PA800.items()},
-    "PA-5220": (PA5200_SHEET, _pa5200(15, 8.8, 9.5, 150000)),
-    "PA-5250": (PA5200_SHEET, _pa5200(35, 19, 18.4, 368000)),
-    "PA-5260": (PA5200_SHEET, _pa5200(55, 31, 25, 500000)),
-    "PA-5280": (PA5200_SHEET, _pa5200(55, 31, 25, 500000)),
+    # Sessions come from the datasheets too, not from the older workbook: its binary figures
+    # (e.g. 3 x 1,048,576) are ~5% higher, and 3,145,728 vs the PA-3260's published 2.2M
+    # would reject replacements that a datasheet comparison accepts.
+    "PA-3220": (PA3200_SHEET, _perf(4, 2.2, 2.4, 46000, 1_000_000)),
+    "PA-3250": (PA3200_SHEET, _perf(5, 2.5, 2.6, 58000, 2_000_000)),
+    "PA-3260": (PA3200_SHEET, _perf(7.5, 4, 4.4, 84000, 2_200_000)),
+    "PA-5220": (PA5200_SHEET, _perf(15, 8.8, 9.5, 150000, 4_000_000)),
+    "PA-5250": (PA5200_SHEET, _perf(35, 19, 18.4, 368000, 8_000_000)),
+    "PA-5260": (PA5200_SHEET, _perf(55, 31, 25, 500000, 32_000_000)),
+    "PA-5280": (PA5200_SHEET, _perf(55, 31, 25, 500000, 64_000_000)),
 }
-NO_PERFORMANCE = "Throughput and connections per second are not known for this model."
 MODEL_NOTES = {
     "PA-850": "End of sale. Also sold with 4 SFP + 4 SFP+ instead of 8 SFP; the 8 SFP layout "
     "is stored.",
-    "PA-3220": f"End of sale. {NO_PERFORMANCE}",
-    "PA-3250": f"End of sale. {NO_PERFORMANCE}",
-    "PA-3260": f"End of sale. {NO_PERFORMANCE}",
+    "PA-3220": "End of sale.",
+    "PA-3250": "End of sale.",
+    "PA-3260": "End of sale.",
     "PA-5220": "End of sale.",
     "PA-5250": "End of sale.",
     "PA-5260": "End of sale.",

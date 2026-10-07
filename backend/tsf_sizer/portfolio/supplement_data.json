@@ -6,7 +6,7 @@
    "ports": {
     "10G_SFP+": 4,
     "1G_RJ45": 12,
-    "1G_SFP": 8
+    "1G_SFP": 4
    },
    "values": {
     "config.address_groups": {
@@ -286,8 +286,7 @@
    "port_variants": [],
    "ports": {
     "10G_SFP+": 8,
-    "1G_RJ45": 12,
-    "1G_SFP": 8
+    "1G_RJ45": 12
    },
    "values": {
     "config.address_groups": {
@@ -568,7 +567,6 @@
    "ports": {
     "10G_SFP+": 8,
     "1G_RJ45": 12,
-    "1G_SFP": 8,
     "40G_QSFP+": 4
    },
    "values": {
