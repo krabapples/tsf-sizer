@@ -4,12 +4,12 @@ services:
     image: tsf-sizer:latest
     container_name: tsf-sizer
     ports:
-      # Default: only reachable from this machine. To open it to your network set
-      # TSF_SIZER_BIND=0.0.0.0 (e.g. in .env) and also set TSF_SIZER_USER and
-      # TSF_SIZER_PASSWORD, as the app handles customer data. Change the host
-      # port with TSF_SIZER_PORT. For a shared server put a reverse proxy with
-      # HTTPS in front.
-      - "${TSF_SIZER_BIND:-127.0.0.1}:${TSF_SIZER_PORT:-8088}:8088"
+      # Default: reachable from the network on every address of this machine. The app
+      # handles customer data: set TSF_SIZER_USER and TSF_SIZER_PASSWORD (e.g. in .env),
+      # or restrict it to this machine with TSF_SIZER_BIND=127.0.0.1. Change the host
+      # port with TSF_SIZER_PORT. For a shared server put a reverse proxy with HTTPS
+      # in front.
+      - "${TSF_SIZER_BIND:-0.0.0.0}:${TSF_SIZER_PORT:-8088}:8088"
     volumes:
       - tsf-sizer-data:/data
     environment:

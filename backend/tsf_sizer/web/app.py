@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import secrets
 import uuid
@@ -85,6 +86,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     report_view.register_filters(templates.env)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
+    if not (settings.user and settings.password):
+        logging.getLogger("uvicorn.error").warning(
+            "No login configured (TSF_SIZER_USER / TSF_SIZER_PASSWORD): anyone who can reach "
+            "this port can open every report. Set a login, or bind to 127.0.0.1."
+        )
     if settings.user and settings.password:
         expected = base64.b64encode(f"{settings.user}:{settings.password}".encode()).decode()
 

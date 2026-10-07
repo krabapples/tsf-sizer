@@ -26,18 +26,17 @@ Stop with `docker compose down`. Analyses and the portfolio survive restarts (Do
 | `TSF_SIZER_USER`, `TSF_SIZER_PASSWORD` | not set | Require a login (HTTP basic auth). Set both. |
 | `TSF_SIZER_MAX_UPLOAD_MB` | `1024` | Upload limit per file |
 | `TSF_SIZER_PORT` | `8088` | Port on your machine (if 8088 is taken too) |
-| `TSF_SIZER_BIND` | `127.0.0.1` | Address to listen on. Set `0.0.0.0` to reach the app from other machines (then also set a login) |
+| `TSF_SIZER_BIND` | `0.0.0.0` | Address to listen on. `0.0.0.0`: reachable from the network; `127.0.0.1`: this machine only |
 | `TSF_SIZER_LLM_PROVIDER`, `_MODEL`, `_BASE_URL`, `_API_KEY`, `_TIMEOUT` | off | Optional AI summary, see below |
 
-By default the app is only reachable from the machine it runs on (`127.0.0.1:8088`). To use it from other machines, e.g. `http://192.168.2.170:8088`, put this in a `.env` file next to `docker-compose.yml`, then run `docker compose up -d`:
+By default the app listens on every network address of the machine, so colleagues can open it at `http://<machine-ip>:8088` (e.g. `http://192.168.2.170:8088`). It handles customer data and has **no login unless you set one**: put this in a `.env` file next to `docker-compose.yml`, then run `docker compose up -d`:
 
 ```bash
-TSF_SIZER_BIND=0.0.0.0
 TSF_SIZER_USER=sizer
 TSF_SIZER_PASSWORD=choose-a-password
 ```
 
-If it still cannot be reached, check the host's firewall (e.g. `sudo ufw allow 8088/tcp`). For a shared team server, put a reverse proxy with HTTPS in front of it.
+To keep the app reachable from this machine only, add `TSF_SIZER_BIND=127.0.0.1`. If other machines still cannot connect, check the host's firewall (e.g. `sudo ufw allow 8088/tcp`). For a shared team server, put a reverse proxy with HTTPS in front of it.
 
 ### AI summary with a local LLM (optional)
 
