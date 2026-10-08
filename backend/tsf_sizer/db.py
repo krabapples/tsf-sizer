@@ -112,6 +112,21 @@ CREATE TABLE IF NOT EXISTS analysis (
     created_by   TEXT
 );
 
+-- The conversation with the assistant that refines one analysis. Every turn that changed
+-- the sizing keeps the parameters from before, so it can be undone.
+CREATE TABLE IF NOT EXISTS analysis_message (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id        INTEGER NOT NULL,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    role               TEXT NOT NULL,        -- user | assistant
+    content            TEXT,
+    status             TEXT NOT NULL DEFAULT 'done',   -- pending | done | error
+    changes_json       TEXT,                 -- [{"text": ...}] applied this turn
+    params_before_json TEXT,
+    undone             INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS analysis_message_by_analysis ON analysis_message (analysis_id, id);
+
 -- Team-maintained settings per product family. Never overwritten by an import.
 --   quotable:       1/0 overrides the sheet's NPI status for the whole family
 --   superseded_by:  family that replaces this one; superseded families are

@@ -67,6 +67,49 @@
   </form>
 </details>
 
+<section class="card assistant no-print" id="assistant" aria-labelledby="assistant-h">
+  <div class="assistant-head">
+    <span class="icon-bubble">{{ icon('sparkles') }}</span>
+    <div class="assistant-title">
+      <h2 id="assistant-h">Refine with the assistant</h2>
+      <p class="muted small">Tell it what is different for this customer. It adjusts the sizing rules, the engine recomputes, and every change is listed and can be undone.</p>
+    </div>
+  </div>
+  {% if adjustments %}
+  <div class="adjustments" aria-label="Adjustments in effect">
+    <span class="muted small">In effect:</span>
+    {% for adj in adjustments %}<span class="chip chip-warn">{{ adj }}</span>{% endfor %}
+    <form method="post" action="/analyses/{{ a.id }}/adjustments/clear"><button class="btn btn-sm btn-ghost" type="submit">Clear all</button></form>
+  </div>
+  {% endif %}
+  {% if not llm.enabled %}
+  <div class="callout callout-info">{{ icon('info') }}<div>The assistant needs an LLM. A local model on Ollama keeps customer data on your network. <a href="/settings">Set one up on the AI settings page</a>.</div></div>
+  {% else %}
+  <div class="chat-log" id="chat-log" aria-live="polite">
+    {% for m in messages %}
+    <div class="bubble bubble-{{ m.role }}{% if m.status == 'error' %} bubble-error{% endif %}" data-id="{{ m.id }}" data-status="{{ m.status }}">
+      {% if m.status == 'pending' %}<span class="spinner"></span> Thinking… local models can take a minute.{% else %}<p>{{ m.content }}</p>{% endif %}
+      {% if m.changes %}
+        {% if m.changes.applied %}<ul class="changes">{% for c in m.changes.applied %}<li>{{ icon('check', 'icon-sm') }}{{ c }}</li>{% endfor %}</ul>{% endif %}
+        {% if m.changes.refused %}<ul class="changes refused">{% for c in m.changes.refused %}<li>{{ icon('alert', 'icon-sm') }}{{ c }}</li>{% endfor %}</ul>{% endif %}
+        {% if m.changes.unverified and (m.changes.unverified.unverified_numbers or m.changes.unverified.unverified_models) %}<p class="small muted">{{ icon('alert', 'icon-sm') }} Check: {{ (m.changes.unverified.unverified_models + m.changes.unverified.unverified_numbers)|join(', ') }} not in the sizing data.</p>{% endif %}
+      {% endif %}
+      {% if m.undone %}<p class="small muted">(undone)</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/analyses/{{ a.id }}/chat" class="chat-form" id="chat-form">
+    <label class="sr-only" for="chat-input">Message to the assistant</label>
+    <textarea id="chat-input" name="message" rows="2" maxlength="1000" required placeholder="e.g. The customer no longer needs the optics"></textarea>
+    <button class="btn btn-primary" type="submit" id="chat-send">{{ icon('arrow-right') }}<span>Send</span></button>
+  </form>
+  <div class="examples" aria-label="Examples">
+    {% for e in examples %}<button type="button" class="chip chip-primary example" data-text="{{ e }}">{{ e }}</button>{% endfor %}
+  </div>
+  <form method="post" action="/analyses/{{ a.id }}/chat/undo" class="chat-undo" id="chat-undo" hidden><button class="btn btn-sm" type="submit">{{ icon('refresh') }}<span>Undo last change</span></button></form>
+  {% endif %}
+</section>
+
 <nav class="tabs no-print" aria-label="Report sections">
   {% if w and w.html %}<a href="#summary">Summary</a>{% endif %}
   <a href="#recommendation" {% if not (w and w.html) %}class="active"{% endif %}>Recommendation</a>
@@ -305,4 +348,40 @@
   <p>Sources: {{ v.files_used.values()|join(', ') }}{% if h.config_source and h.config_source not in v.files_used.values() %}, {{ h.config_source }}{% endif %}.
   Capacity data: {{ v.portfolio.filename or '–' }} (PAN-OS {{ v.portfolio.panos_release or '?' }}, imported {{ v.portfolio.imported_at or '?' }}).</p>
 </footer>
+{% endblock %}
+{% block scripts %}
+{% if llm.enabled %}
+<script>
+(function () {
+  var form = document.getElementById('chat-form'); if (!form) return;
+  var log = document.getElementById('chat-log'), input = document.getElementById('chat-input');
+  var send = document.getElementById('chat-send'), undo = document.getElementById('chat-undo');
+  var id = {{ a.id }};
+  function bubble(role, html) { var d = document.createElement('div'); d.className = 'bubble bubble-' + role; d.innerHTML = html; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; }
+  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+  document.querySelectorAll('.example').forEach(function (b) { b.addEventListener('click', function () { input.value = b.dataset.text; input.focus(); }); });
+  log.scrollTop = log.scrollHeight;
+  function refreshUndo() {
+    fetch('/api/analyses/' + id + '/chat').then(function (r) { return r.json(); }).then(function (d) { undo.hidden = !d.can_undo; });
+  }
+  refreshUndo();
+  function wait() {
+    fetch('/api/analyses/' + id + '/chat').then(function (r) { return r.json(); }).then(function (d) {
+      var pending = d.messages.some(function (m) { return m.status === 'pending'; });
+      if (pending) { setTimeout(wait, 1500); } else { location.href = '/analyses/' + id + '#assistant'; location.reload(); }
+    }).catch(function () { setTimeout(wait, 3000); });
+  }
+  if (log.querySelector('[data-status="pending"]')) { send.disabled = true; wait(); }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = input.value.trim(); if (!text) return;
+    send.disabled = true;
+    fetch(form.action, { method: 'POST', headers: { 'Accept': 'application/json' }, body: new URLSearchParams({ message: text }) })
+      .then(function (r) { if (!r.ok) { return r.json().then(function (j) { throw new Error(j.detail || 'Could not send'); }); } return r.json(); })
+      .then(function () { input.value = ''; bubble('user', '<p>' + esc(text) + '</p>'); bubble('assistant', '<span class="spinner"></span> Thinking… local models can take a minute.'); wait(); })
+      .catch(function (err) { bubble('assistant bubble-error', '<p>' + esc(err.message) + '</p>'); send.disabled = false; });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

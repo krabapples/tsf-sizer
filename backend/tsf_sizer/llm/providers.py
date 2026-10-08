@@ -117,8 +117,19 @@ def _auth_headers(cfg: LLMConfig) -> dict:
     return {}
 
 
-def chat(cfg: LLMConfig, system: str, user: str) -> LLMReply:
-    """One system + user turn; returns the assistant text."""
+def chat(cfg: LLMConfig, system: str, user: str, *, json_mode: bool = False) -> LLMReply:
+    """One system + user turn; returns the assistant text. `json_mode` asks the server for
+    JSON output where it supports that (retried without it if the server refuses)."""
+    if json_mode:
+        try:
+            return _chat(cfg, system, user, True)
+        except LLMError as e:
+            if "HTTP 400" not in str(e) and "HTTP 422" not in str(e):
+                raise
+    return _chat(cfg, system, user, False)
+
+
+def _chat(cfg: LLMConfig, system: str, user: str, json_mode: bool) -> LLMReply:
     if not cfg.enabled:
         raise LLMError("No LLM configured")
     if cfg.provider == "anthropic" and not cfg.api_key:
@@ -138,6 +149,7 @@ def chat(cfg: LLMConfig, system: str, user: str) -> LLMReply:
                         {"role": "user", "content": user},
                     ],
                     "options": {"temperature": cfg.temperature, "num_predict": cfg.max_tokens},
+                    **({"format": "json"} if json_mode else {}),
                 },
             )
         except LLMError as e:
@@ -155,6 +167,7 @@ def chat(cfg: LLMConfig, system: str, user: str) -> LLMReply:
                 "model": cfg.model,
                 "temperature": cfg.temperature,
                 "max_tokens": cfg.max_tokens,
+                **({"response_format": {"type": "json_object"}} if json_mode else {}),
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},

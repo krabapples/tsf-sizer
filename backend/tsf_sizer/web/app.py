@@ -20,6 +20,7 @@ import secrets
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -29,6 +30,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import db
+from ..llm import agent
 from ..llm import settings as llm_settings
 from ..llm.providers import (
     DEFAULT_BASE_URL,
@@ -39,14 +41,22 @@ from ..llm.providers import (
     list_models,
 )
 from ..llm.writeup import SYSTEM_PROMPT, build_facts
-from ..pipeline import regenerate_writeup, rerun_job, run_job
+from ..pipeline import regenerate_writeup, rerun_job, resize, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
 from ..portfolio.supplements import apply_to_all_documents
+from ..sizing.adjust import describe
 from ..sizing.engine import SizingParams
 from . import report as report_view
 
 HERE = Path(__file__).parent
+EXAMPLES = [
+    "The customer no longer needs the optics",
+    "He now needs two 10G fibre ports",
+    "Expect 40% growth over 5 years",
+    "Ignore the aggregate interface limit",
+    "Why was the PA-560 not chosen?",
+]
 CHUNK = 1024 * 1024
 
 
@@ -75,6 +85,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # A summary that was being written: the sizing result itself is complete.
         conn.execute(
             "UPDATE analysis SET status='done' WHERE status='writing' AND result_json IS NOT NULL"
+        )
+        # A chat turn that was running when the app stopped will never finish.
+        conn.execute(
+            "UPDATE analysis_message SET status='error', content='Interrupted by a restart' "
+            "WHERE status='pending'"
         )
         # Static datasheet models (PA-800) for versions imported before they existed.
         apply_to_all_documents(conn)
@@ -272,6 +287,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
+    def stored_params(row) -> SizingParams:
+        try:
+            return SizingParams(**json.loads(row["params_json"] or "{}"))
+        except TypeError:  # parameters saved by another version
+            return SizingParams()
+
     def load(analysis_id: int):
         with conn() as c:
             row = c.execute("SELECT * FROM analysis WHERE id=?", (analysis_id,)).fetchone()
@@ -310,6 +331,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             need_poe,
             max_size_factor,
         )
+        old = stored_params(row)  # the form has no fields for the assistant's adjustments
+        params.port_drop, params.port_add = old.port_drop, old.port_add
+        params.soft_metrics, params.exclude_models = old.soft_metrics, old.exclude_models
         with conn() as c:
             c.execute("UPDATE analysis SET status='running', error=NULL WHERE id=?", (analysis_id,))
         app.state.executor.submit(
@@ -327,10 +351,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with conn() as c:
             superseded = catalog.superseded_families(c)
             llm = llm_settings.load(c)
-        try:
-            opts = SizingParams(**json.loads(row["params_json"] or "{}"))
-        except TypeError:  # parameters saved by another version
-            opts = SizingParams()
+        opts = stored_params(row)
+        with conn() as c:
+            messages = chat_messages(c, analysis_id)
         return render(
             request,
             "report.html",
@@ -341,6 +364,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             superseded=superseded,
             llm=llm,
             had_writeup="writeup" in result,
+            messages=messages,
+            adjustments=describe(opts, agent.metric_catalog()),
+            examples=EXAMPLES,
         )
 
     @app.get("/api/analyses/{analysis_id}")
@@ -469,10 +495,115 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         return settings_page(request, "Settings saved.")
 
+    # ------------------------------------------------------------------ assistant
+
+    def chat_messages(c, analysis_id: int) -> list[dict]:
+        out = []
+        for m in c.execute(
+            "SELECT id, role, content, status, changes_json, undone FROM analysis_message "
+            "WHERE analysis_id=? ORDER BY id",
+            (analysis_id,),
+        ):
+            d = dict(m)
+            d["changes"] = json.loads(d.pop("changes_json") or "null")
+            out.append(d)
+        return out
+
+    def last_undoable(c, analysis_id: int):
+        return c.execute(
+            "SELECT id, params_before_json FROM analysis_message WHERE analysis_id=? "
+            "AND role='assistant' AND params_before_json IS NOT NULL AND undone=0 "
+            "AND status='done' ORDER BY id DESC LIMIT 1",
+            (analysis_id,),
+        ).fetchone()
+
+    @app.get("/api/analyses/{analysis_id}/chat")
+    def chat_state(analysis_id: int):
+        load(analysis_id)
+        with conn() as c:
+            msgs = chat_messages(c, analysis_id)
+            can_undo = last_undoable(c, analysis_id) is not None
+        return {"messages": msgs, "can_undo": can_undo}
+
+    @app.post("/analyses/{analysis_id}/chat")
+    def chat_send(request: Request, analysis_id: int, message: str = Form("")):
+        row = load(analysis_id)
+        text = message.strip()
+        if row["status"] != "done" or not row["result_json"]:
+            raise HTTPException(409, "The analysis is not finished")
+        if not text or len(text) > agent.MAX_MESSAGE:
+            raise HTTPException(400, f"Write a message of 1-{agent.MAX_MESSAGE} characters")
+        with conn() as c:
+            if not llm_settings.load(c).enabled:
+                raise HTTPException(400, "No LLM configured: set one up on the AI settings page")
+            c.execute(  # a turn that has been "thinking" for half an hour is lost
+                "UPDATE analysis_message SET status='error', content='No answer' "
+                "WHERE status='pending' AND created_at < datetime('now', '-30 minutes')"
+            )
+            if c.execute(
+                "SELECT 1 FROM analysis_message WHERE analysis_id=? AND status='pending'",
+                (analysis_id,),
+            ).fetchone():
+                raise HTTPException(409, "The assistant is still working on the last message")
+            uid = c.execute(
+                "INSERT INTO analysis_message (analysis_id, role, content) VALUES (?, 'user', ?)",
+                (analysis_id, text),
+            ).lastrowid
+            aid = c.execute(
+                "INSERT INTO analysis_message (analysis_id, role, status) "
+                "VALUES (?, 'assistant', 'pending')",
+                (analysis_id,),
+            ).lastrowid
+        app.state.executor.submit(agent.run_turn, settings.db_path, analysis_id, uid, aid)
+        if "application/json" in request.headers.get("accept", ""):
+            return {"user_id": uid, "assistant_id": aid}
+        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
+
+    def restore(analysis_id: int, params: SizingParams, note: str) -> None:
+        with conn() as c:
+            row = c.execute(
+                "SELECT result_json FROM analysis WHERE id=?", (analysis_id,)
+            ).fetchone()
+            result = resize(c, json.loads(row[0]), params)
+            c.execute(
+                "UPDATE analysis SET params_json=?, result_json=?, finished_at=datetime('now') "
+                "WHERE id=?",
+                (json.dumps(asdict(params)), json.dumps(result, default=str), analysis_id),
+            )
+            c.execute(
+                "INSERT INTO analysis_message (analysis_id, role, content) "
+                "VALUES (?, 'assistant', ?)",
+                (analysis_id, note),
+            )
+
+    @app.post("/analyses/{analysis_id}/chat/undo")
+    def chat_undo(analysis_id: int):
+        load(analysis_id)
+        with conn() as c:
+            last = last_undoable(c, analysis_id)
+            if last is None:
+                raise HTTPException(409, "Nothing to undo")
+            c.execute("UPDATE analysis_message SET undone=1 WHERE id=?", (last["id"],))
+        before = SizingParams(**json.loads(last["params_before_json"]))
+        restore(analysis_id, before, "Undid the last change.")
+        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
+
+    @app.post("/analyses/{analysis_id}/adjustments/clear")
+    def clear_adjustments(analysis_id: int):
+        row = load(analysis_id)
+        if row["status"] != "done" or not row["result_json"]:
+            raise HTTPException(409, "The analysis is not finished")
+        params = stored_params(row)
+        params.port_drop, params.port_add = [], {}
+        params.soft_metrics, params.exclude_models = [], []
+        restore(analysis_id, params, "Cleared all adjustments.")
+        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
+
     @app.post("/analyses/{analysis_id}/delete")
     def delete_analysis(analysis_id: int):
         load(analysis_id)
         with conn() as c:
+            c.execute("DELETE FROM analysis_message WHERE analysis_id=?", (analysis_id,))
             c.execute("DELETE FROM analysis WHERE id=?", (analysis_id,))
         return RedirectResponse("/", status_code=303)
 

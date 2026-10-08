@@ -82,6 +82,19 @@ What is sent and checked:
 - API keys are only read from `TSF_SIZER_LLM_API_KEY`, never stored or shown.
 - An unreachable or failing LLM never fails the analysis; the report shows the error and a *Try again* button. Untick *Write an AI summary* on the upload form to skip it for one analysis.
 
+### Refining a recommendation with the assistant
+
+With an LLM configured, every finished report has a **Refine with the assistant** card. Type what is different for this customer and the assistant adjusts the sizing rules; the engine recomputes the recommendation, and every change is listed in the conversation and can be undone.
+
+- *"The customer no longer needs the optics"*: SFP/SFP+/QSFP ports are dropped from the port requirement (copper only).
+- *"He now needs two 10G fibre ports"* (or *"he now needs optics"*, which makes it ask how many and which speed): those ports are required on top of today's layout.
+- *"Expect 40% growth over 5 years"*, *"known peak is 800 Mbps"*, *"needs PoE"*, *"include the PA-400"*: the sizing assumptions.
+- *"Ignore the aggregate interface limit"*: a limit that may fall short without excluding a model; the shortfall is flagged as *not blocking* on every model it applies to.
+- *"No 5G models"*, *"leave out the PA-3400 series"*: exclusions.
+- *"Why was the PA-560 not chosen?"*: explains from the engine's reasons, changes nothing.
+
+How it works: the LLM only translates your message into a small set of validated actions (`backend/tsf_sizer/sizing/adjust.py`); it never picks firewalls or calculates. Unknown models, limits or port types and out-of-range numbers are refused and reported. The explanation it writes afterwards is checked against the engine's numbers like the written summary. Only aggregated figures and your own messages are sent to the LLM. If the model is unreachable nothing changes. Models of 8B parameters and up follow the action format reliably; very small ones may need rephrasing. The adjustments stay when you use **Change and re-run**; **Clear all** removes them.
+
 ### Building behind a TLS-inspecting proxy
 
 If the build fails with `CERTIFICATE_VERIFY_FAILED` while installing Python packages, pass your company's CA certificate as a build secret (it is not stored in the image):

@@ -25,6 +25,7 @@ Strict rules:
 - Be concrete: compare the recommended model with the current model and the requirement.
 - Every entry of not_blocking_issues of the recommended model must appear under
   "Before quoting": those are known differences that do not exclude the model.
+- If adjustments_in_effect is not empty, say which customer-specific adjustments apply.
 - If something is uncertain (snapshot values, short history, unconfirmed capacity values),
   say so plainly.
 - English, plain Markdown, at most about 250 words. No tables, no code blocks.
@@ -45,6 +46,19 @@ def _num(v):
     if isinstance(v, float) and v.is_integer():
         return int(v)
     return v
+
+
+def _adjustments(params: dict) -> list[str]:
+    """Adjustments the engineer made for this customer (ports, ignored limits, exclusions)."""
+    from ..portfolio.mapping import TSF_METRIC_MAP
+    from ..sizing.adjust import describe
+    from ..sizing.engine import SizingParams
+
+    try:
+        p = SizingParams(**{k: v for k, v in params.items() if k != "growth_factor"})
+    except TypeError:
+        return []
+    return describe(p, {m: name for m, _c, name, _x in TSF_METRIC_MAP})
 
 
 def build_facts(result: dict) -> dict:
@@ -113,6 +127,7 @@ def build_facts(result: dict) -> dict:
             "poe_needed": sizing.get("need_poe"),
             "previous_generations_included": params.get("include_superseded"),
         },
+        "adjustments_in_effect": _adjustments(params),
         "usage_highlights": usage,
         "recommended": candidate(rec) if rec else None,
         "alternatives": [candidate(c) for c in sizing.get("alternatives", [])],

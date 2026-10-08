@@ -72,6 +72,27 @@ PORT_COMPAT: dict[str, tuple[str, ...]] = {
 _SPEED_ORDER = ["1G", "2.5G", "5G", "10G", "25G", "40G", "100G", "400G"]
 
 
+def is_optical(speed_class: str) -> bool:
+    """SFP / SFP+ / SFP28 / QSFP... ports (a combo port also has a copper side)."""
+    return "SFP" in speed_class or "QSFP" in speed_class
+
+
+def adjust_ports(
+    base: dict[str, int], drop: list[str], add: dict[str, int]
+) -> tuple[dict[str, int], list[str]]:
+    """Apply the customer's port exceptions to the baseline. Returns (ports, explanation)."""
+    out, notes = dict(base), []
+    for d in drop:
+        gone = [c for c in out if is_optical(c)] if d == "optics" else [c for c in out if c == d]
+        for c in gone:
+            notes.append(f"{out.pop(c)}x {c} no longer needed")
+    for c, n in add.items():
+        if n > 0:
+            out[c] = out.get(c, 0) + n
+            notes.append(f"{n}x {c} additionally needed")
+    return out, notes
+
+
 def variants(model: str) -> set[str]:
     """Special-purpose variants: cellular (-5G), rugged (R suffix), PoE."""
     name = model.upper()
@@ -103,6 +124,22 @@ class SizingParams:
     # A candidate may offer at most this many times the performance of the current model
     # (or of the requirement, if higher). 0 disables the cap.
     max_size_factor: float = 5.0
+    # Adjustments for the exceptions of one customer (set from the assistant on the report
+    # page; all optional, all shown in the report):
+    #   port_drop:       speed classes the replacement no longer needs, or "optics" for every
+    #                    SFP/QSFP class (customer moves to copper)
+    #   port_add:        ports the replacement needs on top of the baseline, e.g. {"10G_SFP+": 2}
+    #   soft_metrics:    metric keys (see Requirement.metric / "feature.*") that may fall short
+    #                    without excluding a model; the shortfall is flagged instead
+    #   exclude_models:  model or family names that must not be offered
+    port_drop: list[str] = field(default_factory=list)
+    port_add: dict[str, int] = field(default_factory=dict)
+    soft_metrics: list[str] = field(default_factory=list)
+    exclude_models: list[str] = field(default_factory=list)
+
+    @property
+    def adjusted(self) -> bool:
+        return bool(self.port_drop or self.port_add or self.soft_metrics or self.exclude_models)
 
     @property
     def growth_factor(self) -> float:
@@ -152,6 +189,7 @@ class Candidate:
     unknown_features: list[str] = field(default_factory=list)
     notices: list[str] = field(default_factory=list)  # soft rules that apply: not blocking
     sort_key: float = 0.0
+    tie_key: tuple[float, float] = (0.0, 0.0)  # sessions, cps: breaks throughput ties
 
 
 @dataclass
@@ -496,6 +534,10 @@ def size(
     else:
         base_ports = dict(traffic)
         rule_text = "the ports in use"
+    base_ports, port_notes = adjust_ports(base_ports, params.port_drop, params.port_add)
+    if port_notes:
+        rule_text += ", adjusted: " + "; ".join(port_notes)
+        result.notes.append("Ports adjusted at your request: " + "; ".join(port_notes) + ".")
     result.ports_needed = {"rule": rule_text, "traffic": traffic, "ha": ha, "baseline": base_ports}
 
     features = {
@@ -543,7 +585,17 @@ def size(
     candidates = []
     fam_row = conn.execute("SELECT family FROM model WHERE name = ?", (current,)).fetchone()
     current_family = fam_row[0] if fam_row else None
-    soft_limits = SOFT_LIMITS.get(current_family, frozenset())
+    family_soft = SOFT_LIMITS.get(current_family, frozenset())
+    user_soft = frozenset(params.soft_metrics)
+    soft_limits = family_soft | user_soft
+    excluded = {x.upper() for x in params.exclude_models}
+    if user_soft:
+        result.notes.append(
+            "Not blocking at your request: " + ", ".join(sorted(user_soft)) + "; a shortfall is "
+            "flagged on the model instead."
+        )
+    if excluded:
+        result.notes.append("Left out at your request: " + ", ".join(sorted(excluded)) + ".")
     # The model list is global (every workbook ever imported adds to it): only models this
     # workbook version has data for can be compared, never "no data passes everything".
     with_data = {
@@ -559,6 +611,12 @@ def size(
             continue
         if model["name"] not in with_data:
             continue
+        if (
+            model["name"].upper() in excluded
+            or (model["family"] or "").upper() in excluded
+            or any(f"VARIANT:{v.upper()}" in excluded for v in variants(model["name"]))
+        ):
+            continue
         if model["family"] in superseded and not params.include_superseded:
             result.excluded_families[model["family"]] = superseded[model["family"]]
             continue
@@ -570,10 +628,17 @@ def size(
             chk = _check(req, caps.get(req.metric))
             if chk.status == "fail" and req.metric in soft_limits:
                 chk.status = "warn"
-                cand.notices.append(
-                    f"{chk.label}: {chk.reason}. Not blocking when replacing a {current_family} "
-                    "firewall; check that the aggregate interfaces in use still fit"
-                )
+                if req.metric in family_soft:
+                    cand.notices.append(
+                        f"{chk.label}: {chk.reason}. Not blocking when replacing a "
+                        f"{current_family} firewall; check that the aggregate interfaces in use "
+                        "still fit"
+                    )
+                else:
+                    cand.notices.append(
+                        f"{chk.label}: {chk.reason}. Not blocking at your request; check it "
+                        "with the customer"
+                    )
             cand.checks.append(chk)
             if chk.status == "fail":
                 cand.failures.append(f"{chk.label}: {chk.reason}")
@@ -588,6 +653,11 @@ def size(
             if not (cap.get("bool_value") == 1 or (cap.get("num_value") or 0) > 0):
                 if fkey in SOFT_FEATURES:
                     cand.notices.append(SOFT_FEATURES[fkey].format(model=model["name"]))
+                elif fkey in user_soft:
+                    cand.notices.append(
+                        f"{cap['name']}: not supported on {model['name']}. Not blocking at "
+                        "your request; check it with the customer"
+                    )
                 else:
                     cand.failures.append(f"{cap['name']}: not supported")
 
@@ -625,6 +695,8 @@ def size(
             None,
         )
         cand.sort_key = thr if thr is not None else float("inf")
+        cap = {c.metric: c.candidate_capacity for c in cand.checks}
+        cand.tie_key = (cap.get("perf.sessions") or 0.0, cap.get("perf.cps") or 0.0)
         cand.extra_variants = sorted(
             variants(model["name"]) - variants(current or "") - ({"PoE"} if need_poe else set())
         )
@@ -638,7 +710,7 @@ def size(
     # Smallest passing model first; special-purpose variants (5G, rugged, PoE) only
     # rank ahead when the current box is one too.
     def order(c: Candidate):
-        return (bool(c.extra_variants), c.sort_key, c.model)
+        return (bool(c.extra_variants), c.sort_key, c.tie_key, c.model)
 
     passing = sorted([c for c in candidates if c.passes and not c.too_large], key=order)
     oversized = sorted([c for c in candidates if c.passes and c.too_large], key=order)
