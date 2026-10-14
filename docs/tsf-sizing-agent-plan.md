@@ -1,5 +1,8 @@
 # TSF Sizing Agent: Build Plan
 
+> **Superseded.** This is the original plan (deterministic core, LLM on the edges). The application now works as an agent: see the v2 design (agent with tools, assumptions ledger, verifier, AI gateway) and the README. Parsing, the capacity workbook import and the capacity limit maths described below are still how the tools get their facts.
+
+
 **Goal:** a presales engineer uploads a customer's Tech Support File (TSF). The agent pulls out the firewall's configuration, usage and interface layout, compares them with the portfolio spreadsheet, and recommends a replacement model with the reasoning written out. The engineer reviews it before it goes to the customer.
 
 **Hard rule from the business:** the proposed model must have **more performance, higher object limits, and at least the same interface configuration** as the current firewall, preferably better.

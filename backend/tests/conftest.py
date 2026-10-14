@@ -8,6 +8,8 @@ a Summary sheet marking NPI platforms.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import openpyxl
 import pytest
 from openpyxl.styles import PatternFill
@@ -147,3 +149,65 @@ def conn(tmp_path):
     c = db.connect(tmp_path / "app.db")
     yield c
     c.close()
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def analysis(tmp_path, workbook):
+    """(db_path, analysis_id): the synthetic workbook is imported and active, and the sample TSF
+    (a PA-3430) is analysed and stored, with its assumptions ledger."""
+    import json
+
+    from tsf_sizer import pipeline
+    from tsf_sizer.agent import ledger
+    from tsf_sizer.portfolio.importer import import_workbook
+    from tsf_sizer.sizing.engine import SizingParams
+
+    path = tmp_path / "agent.db"
+    c = db.connect(path)
+    import_workbook(c, workbook, activate=True)
+    params = SizingParams(growth_pct_per_year=20, years=3)
+    result = pipeline.analyze(
+        c, FIXTURES / "techsupport_sample.txt", params, FIXTURES / "config_sample.xml"
+    )
+    with c:
+        c.execute(
+            "INSERT INTO analysis (id, filename, status, params_json, result_json) "
+            "VALUES (1, 'sample.txt', 'done', ?, ?)",
+            (json.dumps(params.__dict__), json.dumps(result, default=str)),
+        )
+        ledger.seed(c, 1, params)
+    c.close()
+    return str(path), 1
+
+
+@pytest.fixture(autouse=True)
+def _no_retry_sleep(monkeypatch):
+    from tsf_sizer.agent import gateway as gw
+
+    monkeypatch.setattr(gw, "RETRY_BASE_S", 0.0)
+
+
+@pytest.fixture
+def gateway():
+    from fake_gateway import FakeGateway
+
+    gw = FakeGateway()
+    yield gw
+    gw.close()
+
+
+@pytest.fixture
+def llm_env(gateway, monkeypatch):
+    """The environment of a container wired to the (fake) gateway."""
+    for key, value in {
+        "TSF_SIZER_LLM_MODE": "gateway",
+        "TSF_SIZER_GATEWAY_URL": gateway.url,
+        "TSF_SIZER_GATEWAY_API_KEY": "secret-key",
+        "TSF_SIZER_GATEWAY_MODEL": "fake-model",
+        "TSF_SIZER_GATEWAY_MAX_RETRIES": "1",
+    }.items():
+        monkeypatch.setenv(key, value)
+    return gateway

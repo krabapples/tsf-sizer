@@ -1,0 +1,38 @@
+{# The conversation with the agent. Needs: messages, run, a (with id) #}
+{% from "_icons.html" import icon %}
+{% for m in messages %}
+  {%- if m.role == 'user' and m.kind == 'start' -%}
+  {%- elif m.role == 'user' -%}
+<div class="bubble bubble-user" data-id="{{ m.id }}"><p>{{ m.content }}</p></div>
+  {%- elif m.role == 'assistant' and m.kind == 'question' -%}
+<div class="bubble bubble-assistant bubble-question" data-id="{{ m.id }}">
+  <p>{{ m.content }}</p>
+  {% if loop.last and run and run.status == 'waiting' %}
+  <div class="options">
+    {% for o in m.data.options or [] %}
+    <form method="post" action="/analyses/{{ a.id }}/agent/messages"><input type="hidden" name="message" value="{{ o }}"><button class="chip chip-primary option" type="submit">{{ o }}{% if o == m.data.default %} (default){% endif %}</button></form>
+    {% endfor %}
+    {% if m.data.default and m.data.default not in (m.data.options or []) %}
+    <form method="post" action="/analyses/{{ a.id }}/agent/messages"><input type="hidden" name="message" value="{{ m.data.default }}"><button class="chip option" type="submit">Use the default: {{ m.data.default }}</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+  {%- elif m.role == 'assistant' and m.kind == 'verdict' -%}
+<div class="bubble bubble-assistant bubble-verdict" data-id="{{ m.id }}">
+  <p>{{ m.content }}</p>
+  <p class="small"><a href="?verdict={{ m.data.version }}#verdict">Verdict version {{ m.data.version }}</a>
+    {% if m.data.verified %}<span class="status status-ok">{{ icon('check', 'icon-sm') }}every figure verified</span>{% else %}<span class="status status-warn">{{ icon('alert', 'icon-sm') }}{{ (m.data.problems or [])|length }} unverified</span>{% endif %}</p>
+</div>
+  {%- elif m.role == 'assistant' -%}
+    {%- if m.content -%}<div class="bubble bubble-assistant" data-id="{{ m.id }}"><p>{{ m.content }}</p></div>{%- endif -%}
+  {%- elif m.role == 'tool' -%}
+<div class="step-line {{ 'step-err' if m.data.ok == false else '' }}" data-id="{{ m.id }}">{{ icon('x' if m.data.ok == false else 'check', 'icon-sm') }}<span>{{ m.data.summary or m.data.tool }}</span>{% if m.data.result_id %}<span class="muted xs">{{ m.data.result_id }}</span>{% endif %}</div>
+  {%- elif m.role == 'notice' -%}
+    {%- if m.kind == 'error' -%}
+<div class="callout callout-error" role="alert" data-id="{{ m.id }}">{{ icon('x-circle') }}<div>{{ m.content }}</div></div>
+    {%- else -%}
+<div class="step-line step-note" data-id="{{ m.id }}">{{ icon('info', 'icon-sm') }}<span>{{ m.content }}</span></div>
+    {%- endif -%}
+  {%- endif -%}
+{% endfor %}

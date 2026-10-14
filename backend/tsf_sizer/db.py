@@ -1,4 +1,4 @@
-"""SQLite storage for the portfolio catalogue (and, later, analyses)."""
+"""SQLite storage: the capacity portfolio, analyses, and the agent's conversation and evidence."""
 
 from __future__ import annotations
 
@@ -112,20 +112,79 @@ CREATE TABLE IF NOT EXISTS analysis (
     created_by   TEXT
 );
 
--- The conversation with the assistant that refines one analysis. Every turn that changed
--- the sizing keeps the parameters from before, so it can be undone.
-CREATE TABLE IF NOT EXISTS analysis_message (
-    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    analysis_id        INTEGER NOT NULL,
-    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
-    role               TEXT NOT NULL,        -- user | assistant
-    content            TEXT,
-    status             TEXT NOT NULL DEFAULT 'done',   -- pending | done | error
-    changes_json       TEXT,                 -- [{"text": ...}] applied this turn
-    params_before_json TEXT,
-    undone             INTEGER NOT NULL DEFAULT 0
+-- The agent: one run per request, the conversation, every tool result (the evidence behind a
+-- verdict), the assumptions ledger, versioned verdicts and the playbook text.
+DROP TABLE IF EXISTS analysis_message;
+
+CREATE TABLE IF NOT EXISTS agent_run (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT,
+    status      TEXT NOT NULL DEFAULT 'running',   -- running | waiting | done | error
+    mode        TEXT,                              -- gateway | direct
+    model       TEXT,
+    steps       INTEGER NOT NULL DEFAULT 0,
+    outcome     TEXT                               -- short text: verdict, question, error ...
 );
-CREATE INDEX IF NOT EXISTS analysis_message_by_analysis ON analysis_message (analysis_id, id);
+CREATE INDEX IF NOT EXISTS agent_run_by_analysis ON agent_run (analysis_id, id);
+
+CREATE TABLE IF NOT EXISTS agent_message (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER NOT NULL,
+    run_id      INTEGER,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    role        TEXT NOT NULL,        -- user | assistant | tool | notice
+    kind        TEXT NOT NULL DEFAULT 'text',  -- text | question | error | verdict
+    content     TEXT,
+    data_json   TEXT                  -- tool calls, question options, tool name and result id
+);
+CREATE INDEX IF NOT EXISTS agent_message_by_analysis ON agent_message (analysis_id, id);
+
+CREATE TABLE IF NOT EXISTS tool_result (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,   -- shown as r<id>
+    analysis_id INTEGER NOT NULL,
+    run_id      INTEGER,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    tool        TEXT NOT NULL,
+    args_json   TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    error       TEXT
+);
+CREATE INDEX IF NOT EXISTS tool_result_by_analysis ON tool_result (analysis_id, id);
+
+-- Every input that shaped an answer. The effective value of a key is its newest active row.
+CREATE TABLE IF NOT EXISTS assumption (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    key         TEXT NOT NULL,
+    value_json  TEXT NOT NULL,
+    source      TEXT NOT NULL,        -- default | user | agent | form
+    reason      TEXT,
+    active      INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS assumption_by_analysis ON assumption (analysis_id, key, id);
+
+CREATE TABLE IF NOT EXISTS verdict (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER NOT NULL,
+    version     INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    run_id      INTEGER,
+    verdict_json TEXT NOT NULL,
+    verified    INTEGER NOT NULL DEFAULT 0,
+    problems_json TEXT,               -- claims the verifier could not match
+    ledger_json TEXT
+);
+CREATE INDEX IF NOT EXISTS verdict_by_analysis ON verdict (analysis_id, version);
+
+CREATE TABLE IF NOT EXISTS playbook_version (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    text       TEXT NOT NULL,
+    active     INTEGER NOT NULL DEFAULT 1
+);
 
 -- Team-maintained settings per product family. Never overwritten by an import.
 --   quotable:       1/0 overrides the sheet's NPI status for the whole family

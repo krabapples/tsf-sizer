@@ -1,5 +1,5 @@
 {# Sizing options shared by the upload form and the re-run form.
-   Needs: opts (SizingParams), superseded, llm, ai_checked, open_assumptions #}
+   Needs: opts (SizingParams), superseded, open_assumptions #}
 {% from "_icons.html" import icon %}
       <fieldset class="field" style="border:0;padding:0;margin:0">
         <legend class="label" style="margin-bottom:6px">Port rule</legend>
@@ -17,16 +17,6 @@
           <span class="hint">{% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %}. Off: only the current generation is recommended.</span>
         </span>
         <span class="switch"><input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch" {% if opts.include_superseded %}checked{% endif %}><span class="track"></span></span>
-      </label>
-      {% endif %}
-
-      {% if llm.enabled %}
-      <label class="switch-row" for="ai_summary">
-        <span class="text">
-          <strong>Write an AI summary</strong>
-          <span class="hint">{{ llm.label }}{% if llm.provider == 'ollama' %} (local){% endif %}. Only computed figures are sent, never the TSF. <a href="/settings">Settings</a></span>
-        </span>
-        <span class="switch"><input id="ai_summary" name="ai_summary" type="checkbox" value="1" role="switch" {% if ai_checked %}checked{% endif %}><span class="track"></span></span>
       </label>
       {% endif %}
 

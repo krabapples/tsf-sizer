@@ -1,5 +1,8 @@
 """FastAPI web app: upload a TSF, get a sizing report.
 
+The agent reaches its LLM through the Prisma AIRS AI Gateway; see agent/config.py for the
+TSF_SIZER_LLM_MODE and TSF_SIZER_GATEWAY_* variables.
+
 Configuration (environment variables):
   TSF_SIZER_DB          SQLite path (default /data/app.db in the container)
   TSF_SIZER_DATA        data directory for temporary uploads (default: next to the DB)
@@ -20,7 +23,6 @@ import secrets
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -30,31 +32,23 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import db
-from ..llm import agent
-from ..llm import settings as llm_settings
-from ..llm.providers import (
-    DEFAULT_BASE_URL,
-    LOCAL_PROVIDERS,
-    PROVIDERS,
-    LLMError,
-    chat,
-    list_models,
-)
-from ..llm.writeup import SYSTEM_PROMPT, build_facts
-from ..pipeline import regenerate_writeup, rerun_job, resize, run_job
+from ..agent import config as llm_config
+from ..agent import ledger, playbook, runtime
+from ..agent.gateway import GatewayClient, GatewayError
+from ..pipeline import refresh_quick_result, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
 from ..portfolio.supplements import apply_to_all_documents
-from ..sizing.adjust import describe
 from ..sizing.engine import SizingParams
+from . import agent_view
 from . import report as report_view
 
 HERE = Path(__file__).parent
 EXAMPLES = [
     "The customer no longer needs the optics",
     "He now needs two 10G fibre ports",
+    "The box is oversized: find a smaller model",
     "Expect 40% growth over 5 years",
-    "Ignore the aggregate interface limit",
     "Why was the PA-560 not chosen?",
 ]
 CHUNK = 1024 * 1024
@@ -82,14 +76,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "UPDATE analysis SET status='error', error='Interrupted by a restart' "
             "WHERE status IN ('queued', 'running')"
         )
-        # A summary that was being written: the sizing result itself is complete.
+        # An agent run that was working when the app stopped will never finish.
         conn.execute(
-            "UPDATE analysis SET status='done' WHERE status='writing' AND result_json IS NOT NULL"
-        )
-        # A chat turn that was running when the app stopped will never finish.
-        conn.execute(
-            "UPDATE analysis_message SET status='error', content='Interrupted by a restart' "
-            "WHERE status='pending'"
+            "UPDATE agent_run SET status='error', outcome='Interrupted by a restart' "
+            "WHERE status='running'"
         )
         # Static datasheet models (PA-800) for versions imported before they existed.
         apply_to_all_documents(conn)
@@ -97,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="TSF Sizer", docs_url=None, redoc_url=None)
     app.state.settings = settings
     app.state.executor = ThreadPoolExecutor(max_workers=settings.workers)
+    app.state.agent_executor = ThreadPoolExecutor(max_workers=settings.workers)
     templates = Jinja2Templates(directory=str(HERE / "templates"))
     report_view.register_filters(templates.env)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
@@ -179,7 +170,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             history.append(item)
         with conn() as c:
             superseded = catalog.superseded_families(c)
-            llm = llm_settings.load(c)
+        llm = llm_config.from_env()
         return render(
             request,
             "index.html",
@@ -244,7 +235,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         peak_cps: str = Form(""),
         peak_sessions: str = Form(""),
         port_rule: str = Form("all"),
-        ai_summary: str = Form(""),
         include_superseded: str = Form(""),
         need_poe: str = Form(""),
         max_size_factor: float = Form(5.0),
@@ -283,15 +273,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             params,
             filename,
             config_name,
-            bool(ai_summary),
+            lambda aid: start_agent(aid),
         )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
-    def stored_params(row) -> SizingParams:
-        try:
-            return SizingParams(**json.loads(row["params_json"] or "{}"))
-        except TypeError:  # parameters saved by another version
-            return SizingParams()
+    def start_agent(analysis_id: int, user_text: str | None = None) -> int | None:
+        """Start an agent run (the first one reads the evidence; later ones answer the
+        engineer). None if the LLM is off or a run is already working."""
+        if not llm_config.from_env().enabled:
+            return None
+        with conn() as c:
+            if runtime.active_run(c, analysis_id):
+                return None
+            run_id = runtime.start_run(c, analysis_id, user_text)
+        app.state.agent_executor.submit(runtime.run_agent, settings.db_path, analysis_id, run_id)
+        return run_id
 
     def load(analysis_id: int):
         with conn() as c:
@@ -300,74 +296,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Analysis not found")
         return row
 
-    @app.post("/analyses/{analysis_id}/rerun")
-    def rerun_analysis(
-        analysis_id: int,
-        growth_pct: float = Form(20.0),
-        years: int = Form(3),
-        target_util_pct: float = Form(70.0),
-        peak_throughput_mbps: str = Form(""),
-        peak_cps: str = Form(""),
-        peak_sessions: str = Form(""),
-        port_rule: str = Form("all"),
-        ai_summary: str = Form(""),
-        include_superseded: str = Form(""),
-        need_poe: str = Form(""),
-        max_size_factor: float = Form(5.0),
-    ):
-        """Size a finished analysis again with other assumptions; no re-upload needed."""
-        row = load(analysis_id)
-        if row["status"] != "done" or not row["result_json"]:
-            raise HTTPException(409, "Only a finished analysis can be re-run")
-        params = build_params(
-            growth_pct,
-            years,
-            target_util_pct,
-            peak_throughput_mbps,
-            peak_cps,
-            peak_sessions,
-            port_rule,
-            include_superseded,
-            need_poe,
-            max_size_factor,
-        )
-        old = stored_params(row)  # the form has no fields for the assistant's adjustments
-        params.port_drop, params.port_add = old.port_drop, old.port_add
-        params.soft_metrics, params.exclude_models = old.soft_metrics, old.exclude_models
-        params.right_size, params.only_models = old.right_size, old.only_models
-        with conn() as c:
-            c.execute("UPDATE analysis SET status='running', error=NULL WHERE id=?", (analysis_id,))
-        app.state.executor.submit(
-            rerun_job, settings.db_path, analysis_id, params, bool(ai_summary)
-        )
-        return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
-
     @app.get("/analyses/{analysis_id}", response_class=HTMLResponse)
-    def show_analysis(request: Request, analysis_id: int):
+    def show_analysis(request: Request, analysis_id: int, verdict: int | None = None):
         row = load(analysis_id)
         if row["status"] != "done":
             return render(request, "status.html", a=dict(row))
         result = json.loads(row["result_json"])
         view = report_view.build(result, dict(row))
+        cfg = llm_config.from_env()
         with conn() as c:
             superseded = catalog.superseded_families(c)
-            llm = llm_settings.load(c)
-        opts = stored_params(row)
-        with conn() as c:
-            messages = chat_messages(c, analysis_id)
+            messages = agent_view.messages(c, analysis_id)
+            run = agent_view.run_state(c, analysis_id)
+            vv = agent_view.verdict_view(c, analysis_id, verdict)
+            ledger_rows = agent_view.ledger_rows(c, analysis_id)
+            ledger_history = ledger.history(c, analysis_id)
         return render(
             request,
             "report.html",
             a=dict(row),
             r=result,
             v=view,
-            opts=opts,
+            llm=cfg,
             superseded=superseded,
-            llm=llm,
-            had_writeup="writeup" in result,
             messages=messages,
-            adjustments=describe(opts, agent.metric_catalog()),
+            run=run,
+            vv=vv,
+            ledger_rows=ledger_rows,
+            ledger_history=ledger_history,
             examples=EXAMPLES,
+            last_id=messages[-1]["id"] if messages else 0,
         )
 
     @app.get("/api/analyses/{analysis_id}")
@@ -387,225 +345,156 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
-    @app.post("/analyses/{analysis_id}/summary")
-    def rewrite_summary(analysis_id: int):
-        row = load(analysis_id)
-        if row["status"] != "done":
-            raise HTTPException(409, "The analysis is not finished")
-        with conn() as c:
-            if not llm_settings.load(c).enabled:
-                raise HTTPException(400, "No LLM configured: set one up on the Settings page")
-            c.execute("UPDATE analysis SET status='writing' WHERE id=?", (analysis_id,))
-        app.state.executor.submit(regenerate_writeup, settings.db_path, analysis_id)
-        return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
+    # ------------------------------------------------------------------ agent
 
-    # ------------------------------------------------------------------ LLM settings
+    @app.get("/api/analyses/{analysis_id}/agent")
+    def agent_state(analysis_id: int, after: int = 0):
+        load(analysis_id)
+        with conn() as c:
+            msgs = agent_view.messages(c, analysis_id, after)
+            run = agent_view.run_state(c, analysis_id)
+        return {"messages": msgs, "run": run, "enabled": llm_config.from_env().enabled}
+
+    @app.get("/analyses/{analysis_id}/agent/messages", response_class=HTMLResponse)
+    def agent_messages_html(request: Request, analysis_id: int, after: int = 0):
+        """The conversation as HTML, for the page to append while a run is working."""
+        load(analysis_id)
+        with conn() as c:
+            msgs = agent_view.messages(c, analysis_id, after)
+            run = agent_view.run_state(c, analysis_id)
+        resp = render(
+            request, "_agent_messages.html", messages=msgs, run=run, a={"id": analysis_id}
+        )
+        resp.headers["X-Run-Status"] = (run or {}).get("status", "none")
+        resp.headers["X-Last-Id"] = str(msgs[-1]["id"] if msgs else after)
+        return resp
+
+    def need_finished(analysis_id: int):
+        row = load(analysis_id)
+        if row["status"] != "done" or not row["result_json"]:
+            raise HTTPException(409, "The analysis is not finished")
+        if not llm_config.from_env().enabled:
+            raise HTTPException(
+                400, "No LLM configured: set the TSF_SIZER_LLM_MODE and gateway variables"
+            )
+        return row
+
+    @app.post("/analyses/{analysis_id}/agent/start")
+    def agent_start(analysis_id: int):
+        need_finished(analysis_id)
+        start_agent(analysis_id)
+        return RedirectResponse(f"/analyses/{analysis_id}#agent", status_code=303)
+
+    @app.post("/analyses/{analysis_id}/agent/messages")
+    def agent_send(request: Request, analysis_id: int, message: str = Form("")):
+        need_finished(analysis_id)
+        text = message.strip()
+        if not text or len(text) > runtime.MAX_MESSAGE:
+            raise HTTPException(400, f"Write a message of 1-{runtime.MAX_MESSAGE} characters")
+        run_id = start_agent(analysis_id, text)
+        if run_id is None:
+            raise HTTPException(409, "The agent is still working on the last message")
+        if "application/json" in request.headers.get("accept", ""):
+            return {"run_id": run_id}
+        return RedirectResponse(f"/analyses/{analysis_id}#agent", status_code=303)
+
+    # ------------------------------------------------------------------ ledger
+
+    @app.post("/analyses/{analysis_id}/ledger/undo")
+    def ledger_undo(analysis_id: int):
+        load(analysis_id)
+        with conn() as c:
+            if ledger.undo_last(c, analysis_id) is None:
+                raise HTTPException(409, "Nothing to undo")
+            refresh_quick_result(c, analysis_id)
+        return RedirectResponse(f"/analyses/{analysis_id}#ledger", status_code=303)
+
+    @app.post("/analyses/{analysis_id}/ledger/refresh")
+    def ledger_refresh(analysis_id: int):
+        """Size the quick result again, for instance after a new capacity workbook."""
+        load(analysis_id)
+        with conn() as c:
+            refresh_quick_result(c, analysis_id)
+        return RedirectResponse(f"/analyses/{analysis_id}#quick", status_code=303)
+
+    @app.post("/analyses/{analysis_id}/ledger/{key}")
+    def ledger_set(analysis_id: int, key: str, value: str = Form("")):
+        row = load(analysis_id)
+        if row["status"] != "done" or not row["result_json"]:
+            raise HTTPException(409, "The analysis is not finished")
+        try:
+            parsed = agent_view.parse_value(key, value)
+            with conn() as c:
+                ledger.set_value(c, analysis_id, key, parsed, "user", "set on the Ledger tab")
+                refresh_quick_result(c, analysis_id)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return RedirectResponse(f"/analyses/{analysis_id}#ledger", status_code=303)
+
+    # ------------------------------------------------------------------ settings
 
     def settings_page(
         request: Request,
         msg: str | None = None,
         ok: bool = True,
-        models: list[str] | None = None,
         test: dict | None = None,
+        playbook_text: str | None = None,
     ):
+        cfg = llm_config.from_env()
         with conn() as c:
-            cfg = llm_settings.load(c)
-            last = c.execute(
-                "SELECT result_json FROM analysis WHERE status='done' ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-        preview = None
-        if last and last[0]:
-            preview = json.dumps(build_facts(json.loads(last[0])), indent=1, ensure_ascii=False)
+            current = playbook.active(c)
+            hist = playbook.history(c)
         return render(
             request,
             "settings.html",
             cfg=cfg,
-            providers=PROVIDERS,
-            default_urls=DEFAULT_BASE_URL,
-            local=cfg.provider in LOCAL_PROVIDERS,
-            env_provider=os.environ.get("TSF_SIZER_LLM_PROVIDER", "none"),
-            api_key_set=bool(cfg.api_key),
+            variables=llm_config.status(cfg),
             msg=msg,
             ok=ok,
-            models=models,
             test=test,
-            preview=preview,
-            system_prompt=SYSTEM_PROMPT,
+            playbook=playbook_text if playbook_text is not None else current,
+            playbook_is_default=current == playbook.default_text(),
+            playbook_history=hist,
         )
 
     @app.get("/settings", response_class=HTMLResponse)
     def show_settings(request: Request, msg: str | None = None):
         return settings_page(request, msg)
 
-    @app.post("/settings", response_class=HTMLResponse)
-    def save_settings(
-        request: Request,
-        provider: str = Form("none"),
-        base_url: str = Form(""),
-        model: str = Form(""),
-        temperature: float = Form(0.2),
-        max_tokens: int = Form(900),
-        timeout: float = Form(180),
-        action: str = Form("save"),
-    ):
-        if provider not in PROVIDERS:
-            raise HTTPException(400, "Unknown provider")
-        if not (0 <= temperature <= 2 and 100 <= max_tokens <= 8000 and 5 <= timeout <= 1800):
-            raise HTTPException(400, "Temperature 0-2, max tokens 100-8000, timeout 5-1800 s")
-        base_url = base_url.strip()
-        if base_url and not base_url.startswith(("http://", "https://")):
-            raise HTTPException(400, "The server URL must start with http:// or https://")
+    @app.post("/settings/test", response_class=HTMLResponse)
+    def test_connection(request: Request):
+        cfg = llm_config.from_env()
+        if not cfg.enabled:
+            return settings_page(
+                request, "The LLM is off or incomplete: see the variables below.", ok=False
+            )
+        try:
+            result = GatewayClient(cfg).test()
+        except GatewayError as e:
+            suffix = f" (request id {e.request_id})" if e.request_id else ""
+            return settings_page(request, f"Test failed ({e.kind}): {e}{suffix}", ok=False)
+        return settings_page(
+            request, f"{cfg.label} answered in {result['seconds']} s.", test=result
+        )
+
+    @app.post("/settings/playbook", response_class=HTMLResponse)
+    def save_playbook(request: Request, text: str = Form(""), action: str = Form("save")):
         with conn() as c:
             if action == "reset":
-                llm_settings.reset(c)
-                return settings_page(request, "Back to the container's environment settings.")
-            llm_settings.save(
-                c,
-                provider=provider,
-                base_url=base_url,
-                model=model.strip(),
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-            )
-            cfg = llm_settings.load(c)
-        if action == "models":
+                playbook.reset(c)
+                return settings_page(request, "Back to the built-in playbook.")
             try:
-                found = list_models(cfg)
-            except LLMError as e:
-                return settings_page(request, f"Could not list models: {e}", ok=False)
-            if not found:
-                return settings_page(
-                    request,
-                    "Connected, but the server has no models. For Ollama: ollama pull <model>.",
-                    ok=False,
-                    models=[],
-                )
-            return settings_page(request, f"Found {len(found)} model(s).", models=found)
-        if action == "test":
-            if not cfg.enabled:
-                return settings_page(request, "Choose a provider and model first.", ok=False)
-            try:
-                reply = chat(cfg, "You are a connectivity test.", "Reply with the single word OK.")
-            except LLMError as e:
-                return settings_page(request, f"Test failed: {e}", ok=False)
-            return settings_page(
-                request,
-                f"{cfg.label} answered in {reply.seconds} s.",
-                test={"text": reply.text[:200]},
-            )
-        return settings_page(request, "Settings saved.")
-
-    # ------------------------------------------------------------------ assistant
-
-    def chat_messages(c, analysis_id: int) -> list[dict]:
-        out = []
-        for m in c.execute(
-            "SELECT id, role, content, status, changes_json, undone FROM analysis_message "
-            "WHERE analysis_id=? ORDER BY id",
-            (analysis_id,),
-        ):
-            d = dict(m)
-            d["changes"] = json.loads(d.pop("changes_json") or "null")
-            out.append(d)
-        return out
-
-    def last_undoable(c, analysis_id: int):
-        return c.execute(
-            "SELECT id, params_before_json FROM analysis_message WHERE analysis_id=? "
-            "AND role='assistant' AND params_before_json IS NOT NULL AND undone=0 "
-            "AND status='done' ORDER BY id DESC LIMIT 1",
-            (analysis_id,),
-        ).fetchone()
-
-    @app.get("/api/analyses/{analysis_id}/chat")
-    def chat_state(analysis_id: int):
-        load(analysis_id)
-        with conn() as c:
-            msgs = chat_messages(c, analysis_id)
-            can_undo = last_undoable(c, analysis_id) is not None
-        return {"messages": msgs, "can_undo": can_undo}
-
-    @app.post("/analyses/{analysis_id}/chat")
-    def chat_send(request: Request, analysis_id: int, message: str = Form("")):
-        row = load(analysis_id)
-        text = message.strip()
-        if row["status"] != "done" or not row["result_json"]:
-            raise HTTPException(409, "The analysis is not finished")
-        if not text or len(text) > agent.MAX_MESSAGE:
-            raise HTTPException(400, f"Write a message of 1-{agent.MAX_MESSAGE} characters")
-        with conn() as c:
-            if not llm_settings.load(c).enabled:
-                raise HTTPException(400, "No LLM configured: set one up on the AI settings page")
-            c.execute(  # a turn that has been "thinking" for half an hour is lost
-                "UPDATE analysis_message SET status='error', content='No answer' "
-                "WHERE status='pending' AND created_at < datetime('now', '-30 minutes')"
-            )
-            if c.execute(
-                "SELECT 1 FROM analysis_message WHERE analysis_id=? AND status='pending'",
-                (analysis_id,),
-            ).fetchone():
-                raise HTTPException(409, "The assistant is still working on the last message")
-            uid = c.execute(
-                "INSERT INTO analysis_message (analysis_id, role, content) VALUES (?, 'user', ?)",
-                (analysis_id, text),
-            ).lastrowid
-            aid = c.execute(
-                "INSERT INTO analysis_message (analysis_id, role, status) "
-                "VALUES (?, 'assistant', 'pending')",
-                (analysis_id,),
-            ).lastrowid
-        app.state.executor.submit(agent.run_turn, settings.db_path, analysis_id, uid, aid)
-        if "application/json" in request.headers.get("accept", ""):
-            return {"user_id": uid, "assistant_id": aid}
-        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
-
-    def restore(analysis_id: int, params: SizingParams, note: str) -> None:
-        with conn() as c:
-            row = c.execute(
-                "SELECT result_json FROM analysis WHERE id=?", (analysis_id,)
-            ).fetchone()
-            result = resize(c, json.loads(row[0]), params)
-            c.execute(
-                "UPDATE analysis SET params_json=?, result_json=?, finished_at=datetime('now') "
-                "WHERE id=?",
-                (json.dumps(asdict(params)), json.dumps(result, default=str), analysis_id),
-            )
-            c.execute(
-                "INSERT INTO analysis_message (analysis_id, role, content) "
-                "VALUES (?, 'assistant', ?)",
-                (analysis_id, note),
-            )
-
-    @app.post("/analyses/{analysis_id}/chat/undo")
-    def chat_undo(analysis_id: int):
-        load(analysis_id)
-        with conn() as c:
-            last = last_undoable(c, analysis_id)
-            if last is None:
-                raise HTTPException(409, "Nothing to undo")
-            c.execute("UPDATE analysis_message SET undone=1 WHERE id=?", (last["id"],))
-        before = SizingParams(**json.loads(last["params_before_json"]))
-        restore(analysis_id, before, "Undid the last change.")
-        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
-
-    @app.post("/analyses/{analysis_id}/adjustments/clear")
-    def clear_adjustments(analysis_id: int):
-        row = load(analysis_id)
-        if row["status"] != "done" or not row["result_json"]:
-            raise HTTPException(409, "The analysis is not finished")
-        params = stored_params(row)
-        params.port_drop, params.port_add = [], {}
-        params.soft_metrics, params.exclude_models = [], []
-        params.right_size, params.only_models = False, []
-        restore(analysis_id, params, "Cleared all adjustments.")
-        return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
+                playbook.save(c, text)
+            except ValueError as e:
+                return settings_page(request, str(e), ok=False, playbook_text=text)
+        return settings_page(request, "Playbook saved. New agent runs use it.")
 
     @app.post("/analyses/{analysis_id}/delete")
     def delete_analysis(analysis_id: int):
         load(analysis_id)
         with conn() as c:
-            c.execute("DELETE FROM analysis_message WHERE analysis_id=?", (analysis_id,))
+            for table in ("agent_message", "agent_run", "tool_result", "assumption", "verdict"):
+                c.execute(f"DELETE FROM {table} WHERE analysis_id=?", (analysis_id,))  # noqa: S608
             c.execute("DELETE FROM analysis WHERE id=?", (analysis_id,))
         return RedirectResponse("/", status_code=303)
 

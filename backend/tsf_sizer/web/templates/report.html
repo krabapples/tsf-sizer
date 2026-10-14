@@ -20,6 +20,26 @@
 {% if unconfirmed %}<span class="status status-warn" title="Orange cell in the capacity sheet: not tested or confirmed yet">unconfirmed</span>{% endif %}
 {%- endmacro %}
 
+{% macro fit_table(fit) -%}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th scope="col">Limit</th><th scope="col" class="num">Required</th><th scope="col" class="num">{{ h.model }}</th><th scope="col" class="num">{{ fit.model }}</th><th scope="col" class="num">Headroom</th><th scope="col">Result</th></tr></thead>
+  <tbody>
+  {% for x in fit.limits %}
+    <tr>
+      <th scope="row">{{ x.label }}</th>
+      <td class="num">{{ x.required|num(3) }}</td>
+      <td class="num">{{ x.current_limit|num }}</td>
+      <td class="num"><strong>{{ x.candidate_limit|num if x.candidate_limit is not none else (x.raw or '–') }}</strong></td>
+      <td class="num">{{ x.headroom_pct|pct }}</td>
+      <td>{{ status_badge(x.status, x.unconfirmed) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}
+
 {% block content %}
 <section class="hero reveal" aria-labelledby="report-title">
   <div class="hero-top">
@@ -48,97 +68,118 @@
     {% if v.need_poe %}<span class="chip chip-glass">{{ icon('plug', 'icon-sm') }}PoE needed{% if v.poe.ports_in_use %} · in use on {{ v.poe.ports_in_use|length }} port(s){% endif %}</span>{% endif %}
   </div>
 </section>
-
 {% if a.error %}
-<div class="callout callout-error no-print" role="alert">{{ icon('x-circle') }}<div>{{ a.error }} The report below is the previous result.</div></div>
+<div class="callout callout-error no-print" role="alert">{{ icon('x-circle') }}<div>{{ a.error }}</div></div>
 {% endif %}
-<details class="card rerun no-print" id="rerun" {% if a.error %}open{% endif %}>
-  <summary class="rerun-head">
-    <span class="icon-bubble">{{ icon('sliders') }}</span>
-    <span class="rerun-title"><strong>Sizing assumptions</strong>
-      <span class="muted small">{{ opts.growth_pct_per_year|num }}% growth/yr over {{ opts.years }} yrs · {{ opts.target_util_pct|num }}% target utilization · {{ 'ports in use' if opts.port_rule == 'used' else 'full port layout' }}{% if opts.need_poe %} · PoE{% endif %}{% if opts.include_superseded %} · previous generations{% endif %}{% if opts.peak_throughput_mbps or opts.peak_cps or opts.peak_sessions %} · known peaks{% endif %}</span></span>
-    <span class="btn btn-sm">{{ icon('refresh') }}<span>Change and re-run</span></span>
-  </summary>
-  <form method="post" action="/analyses/{{ a.id }}/rerun" class="stack rerun-form">
-    <p class="muted small">The TSF is not needed again: the figures read from it are kept. Re-running also uses the portfolio that is active now.</p>
-    {% set ai_checked = llm.enabled and had_writeup %}{% set open_assumptions = true %}
-    {% include "_options.html" %}
-    <div><button type="submit" class="btn btn-primary">{{ icon('refresh') }}<span>Re-run sizing</span></button></div>
-  </form>
-</details>
 
-<section class="card assistant no-print" id="assistant" aria-labelledby="assistant-h">
+<section class="card assistant no-print" id="agent" aria-labelledby="agent-h">
   <div class="assistant-head">
     <span class="icon-bubble">{{ icon('sparkles') }}</span>
     <div class="assistant-title">
-      <h2 id="assistant-h">Refine with the assistant</h2>
-      <p class="muted small">Tell it what is different for this customer. It adjusts the sizing rules, the engine recomputes, and every change is listed and can be undone.</p>
+      <h2 id="agent-h">Reason with the agent</h2>
+      <p class="muted small">The agent reads the evidence, asks what it needs, checks models with deterministic tools and gives a verdict in which every figure is checked. Challenge it, change an assumption, ask why.</p>
     </div>
+    {% if run %}<span class="chip {{ 'chip-good' if run.status == 'done' else ('chip-crit' if run.status == 'error' else 'chip-warn') }}" title="{{ run.model or '' }}">{{ icon('cpu', 'icon-sm') }}{{ {'running': 'working', 'waiting': 'waiting for you', 'done': 'ready', 'error': 'stopped'}[run.status] }}</span>{% endif %}
   </div>
-  {% if adjustments %}
-  <div class="adjustments" aria-label="Adjustments in effect">
-    <span class="muted small">In effect:</span>
-    {% for adj in adjustments %}<span class="chip chip-warn">{{ adj }}</span>{% endfor %}
-    <form method="post" action="/analyses/{{ a.id }}/adjustments/clear"><button class="btn btn-sm btn-ghost" type="submit">Clear all</button></form>
-  </div>
-  {% endif %}
   {% if not llm.enabled %}
-  <div class="callout callout-info">{{ icon('info') }}<div>The assistant needs an LLM. A local model on Ollama keeps customer data on your network. <a href="/settings">Set one up on the AI settings page</a>.</div></div>
+  <div class="callout callout-info">{{ icon('info') }}<div>The agent needs an LLM, reached through the AI gateway. <a href="/settings">See the settings page</a> for the variables. The Quick result tab works without it.</div></div>
+  {% endif %}
+  <div class="chat-log" id="chat-log" aria-live="polite">{% include "_agent_messages.html" %}</div>
+  <div class="bubble bubble-assistant bubble-working" id="working" {% if not (run and run.status == 'running') %}hidden{% endif %}><span class="spinner"></span> Working… the agent is reading and checking. This page updates by itself.</div>
+  {% if llm.enabled %}
+  {% if not messages %}
+  <form method="post" action="/analyses/{{ a.id }}/agent/start"><button class="btn btn-primary" type="submit">{{ icon('sparkles') }}<span>Start with the agent</span></button></form>
   {% else %}
-  <div class="chat-log" id="chat-log" aria-live="polite">
-    {% for m in messages %}
-    <div class="bubble bubble-{{ m.role }}{% if m.status == 'error' %} bubble-error{% endif %}" data-id="{{ m.id }}" data-status="{{ m.status }}">
-      {% if m.status == 'pending' %}<span class="spinner"></span> Thinking… local models can take a minute.{% else %}<p>{{ m.content }}</p>{% endif %}
-      {% if m.changes %}
-        {% if m.changes.applied %}<ul class="changes">{% for c in m.changes.applied %}<li>{{ icon('check', 'icon-sm') }}{{ c }}</li>{% endfor %}</ul>{% endif %}
-        {% if m.changes.refused %}<ul class="changes refused">{% for c in m.changes.refused %}<li>{{ icon('alert', 'icon-sm') }}{{ c }}</li>{% endfor %}</ul>{% endif %}
-        {% if m.changes.unverified and (m.changes.unverified.unverified_numbers or m.changes.unverified.unverified_models) %}<p class="small muted">{{ icon('alert', 'icon-sm') }} Check: {{ (m.changes.unverified.unverified_models + m.changes.unverified.unverified_numbers)|join(', ') }} not in the sizing data.</p>{% endif %}
-      {% endif %}
-      {% if m.undone %}<p class="small muted">(undone)</p>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  <form method="post" action="/analyses/{{ a.id }}/chat" class="chat-form" id="chat-form">
-    <label class="sr-only" for="chat-input">Message to the assistant</label>
-    <textarea id="chat-input" name="message" rows="2" maxlength="1000" required placeholder="e.g. The customer no longer needs the optics"></textarea>
+  <form method="post" action="/analyses/{{ a.id }}/agent/messages" class="chat-form" id="chat-form">
+    <label class="sr-only" for="chat-input">Message to the agent</label>
+    <textarea id="chat-input" name="message" rows="2" maxlength="2000" required placeholder="Answer, correct or challenge the agent"></textarea>
     <button class="btn btn-primary" type="submit" id="chat-send">{{ icon('arrow-right') }}<span>Send</span></button>
   </form>
   <div class="examples" aria-label="Examples">
     {% for e in examples %}<button type="button" class="chip chip-primary example" data-text="{{ e }}">{{ e }}</button>{% endfor %}
   </div>
-  <form method="post" action="/analyses/{{ a.id }}/chat/undo" class="chat-undo" id="chat-undo" hidden><button class="btn btn-sm" type="submit">{{ icon('refresh') }}<span>Undo last change</span></button></form>
+  {% endif %}
   {% endif %}
 </section>
 
-<nav class="tabs no-print" aria-label="Report sections">
-  {% if w and w.html %}<a href="#summary">Summary</a>{% endif %}
-  <a href="#recommendation" {% if not (w and w.html) %}class="active"{% endif %}>Recommendation</a>
-  {% if v.warnings %}<a href="#checks">Check before quoting <span class="chip chip-warn" style="margin-left:6px;padding:0 7px">{{ v.warnings|length }}</span></a>{% endif %}
-  <a href="#usage">Usage</a>
-  <a href="#requirements">Requirements</a>
-  <a href="#interfaces">Interfaces</a>
-  {% if v.rejected %}<a href="#rejected">Not qualifying</a>{% endif %}
-  <a href="#history">History &amp; licenses</a>
+<nav class="panel-tabs no-print" role="tablist" aria-label="Report sections">
+  <button type="button" role="tab" data-panel="verdict">{{ icon('check', 'icon-sm') }}Verdict{% if vv %} <span class="chip chip-good" style="padding:0 7px">v{{ vv.version }}</span>{% endif %}</button>
+  <button type="button" role="tab" data-panel="quick">{{ icon('gauge', 'icon-sm') }}Quick result</button>
+  <button type="button" role="tab" data-panel="ledger">{{ icon('sliders', 'icon-sm') }}Ledger</button>
+  <button type="button" role="tab" data-panel="evidence">{{ icon('activity', 'icon-sm') }}Evidence</button>
 </nav>
 
-{% set w = v.writeup %}
-{% if w and w.html %}
-<section class="card summary reveal" id="summary" aria-labelledby="sum-h">
-  <div class="card-head">
-    <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('sparkles') }}</span><div><h2 id="sum-h">Summary</h2><p class="muted small">Written by {{ w.label }}{% if w.local %} · local{% endif %} · {{ w.seconds }} s · {{ w.generated_at }}. Draft: check before sharing.</p></div></div>
-    <form method="post" action="/analyses/{{ a.id }}/summary" class="no-print"><button class="btn btn-ghost" type="submit" title="Write the summary again with the current AI settings">{{ icon('history') }}<span>Rewrite</span></button></form>
-  </div>
-  {% if w.unverified_numbers or w.unverified_models %}
-  <div class="callout callout-warn" style="margin-bottom:14px">{{ icon('alert') }}<div><strong>Fact check:</strong> the summary mentions {% if w.unverified_models %}model(s) {{ w.unverified_models|join(', ') }}{% endif %}{% if w.unverified_models and w.unverified_numbers %} and {% endif %}{% if w.unverified_numbers %}number(s) {{ w.unverified_numbers|join(', ') }}{% endif %} that are not in the sizing data. Check or rewrite before sharing.</div></div>
-  {% else %}
-  <p class="xs" style="margin:-6px 0 12px"><span class="status status-ok">{{ icon('check', 'icon-sm') }}fact check passed</span> every number and model in the text comes from the sizing data</p>
+<div class="panel {{ 'active' if vv }}" id="panel-verdict" data-panel="verdict">
+{% if not vv %}
+<div class="callout callout-info">{{ icon('info') }}<div><strong>No verdict yet.</strong> <p>{% if llm.enabled %}The agent submits a verdict once it has checked the candidates. Talk to it above.{% else %}Set up the LLM to get a verdict. The Quick result tab has the rule-based result.{% endif %}</p></div></div>
+{% else %}
+{% set vd = vv.verdict %}{% set rc = vd.recommendation %}
+<section id="verdict" aria-labelledby="verdict-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('check') }}</span><div><h2 id="verdict-h">Verdict</h2>
+    <p class="muted small">Version {{ vv.version }} · {{ vv.created_at }} UTC{% if vv.versions|length > 1 %} · other versions: {% for n in vv.versions %}{% if n != vv.version %}<a href="?verdict={{ n }}#verdict">v{{ n }}</a> {% endif %}{% endfor %}{% endif %}</p></div></div>
+  <article class="rec rec-primary">
+    <div class="rec-head">
+      <div>
+        <span class="chip chip-primary">{{ icon('check', 'icon-sm') }}Recommendation</span>
+        <p class="rec-model">{{ rc.model or 'No model fits' }}</p>
+        {% if vv.rec_fit %}<p class="rec-family">{{ vv.rec_fit.family }} family{% if vv.rec_fit.variants %} · {{ vv.rec_fit.variants|join(', ') }} variant{% endif %}</p>{% endif %}
+      </div>
+      <div>
+        {% if vd.confidence %}<span class="chip {{ {'high': 'chip-good', 'medium': 'chip-warn', 'low': 'chip-crit'}[vd.confidence.level] }}" title="{{ vd.confidence.reason }}">confidence: {{ vd.confidence.level }}</span>{% endif %}
+        {% if vv.verified %}<span class="status status-ok">{{ icon('check', 'icon-sm') }}every figure verified</span>{% else %}<span class="status status-warn">{{ icon('alert', 'icon-sm') }}{{ vv.problems|length }} unverified claim(s)</span>{% endif %}
+      </div>
+    </div>
+    <p>{{ rc.reason }}</p>
+    {% if vd.summary %}<p class="muted">{{ vd.summary }}</p>{% endif %}
+    {% if vv.rec_fit %}<dl class="kv">
+      <dt>Closest limits</dt><dd>{{ vv.rec_fit.tightest|join('; ') or '–' }}</dd>
+      <dt>Checked with</dt><dd>{{ vv.rec_fit.mode }} · {{ vv.rec_fit.counts.pass }} pass, {{ vv.rec_fit.counts.fail }} fail, {{ vv.rec_fit.counts.unknown }} no data · <span class="muted">{{ vv.rec_fit.result_id }}</span></dd>
+      {% if vv.rec_fit.throughput_gbps %}<dt>Throughput</dt><dd>{{ vv.rec_fit.throughput_gbps|num }} Gbps ({{ vv.rec_fit.usable_throughput_gbps|num }} Gbps usable at the target){% if vv.rec_fit.throughput_vs_current %}, {{ vv.rec_fit.throughput_vs_current|num }}× the current model{% endif %}</dd>{% endif %}
+    </dl>{% endif %}
+    {% if vv.rec_fit and vv.rec_fit.notices %}<div class="rec-notes">{% for n in vv.rec_fit.notices %}<p>{{ icon('alert', 'icon-sm') }}<span>{{ n }}</span></p>{% endfor %}</div>{% endif %}
+  </article>
+  {% if not vv.verified %}
+  <div class="callout callout-warn" style="margin-top:14px">{{ icon('alert') }}<div><strong>The verifier could not confirm:</strong><ul class="reasons">{% for p in vv.problems %}<li>{{ p }}</li>{% endfor %}</ul></div></div>
   {% endif %}
-  <div class="prose">{{ w.html|safe }}</div>
-</section>
-{% elif w and w.error %}
-<div class="callout callout-warn no-print" role="status">{{ icon('alert') }}<div><strong>No AI summary:</strong> {{ w.error }}<form method="post" action="/analyses/{{ a.id }}/summary" style="display:inline;margin-left:8px"><button class="btn btn-ghost" type="submit">Try again</button></form> <a href="/settings">AI settings</a></div></div>
-{% endif %}
 
+  {% if vd.alternatives %}
+  <h3 style="margin:22px 0 10px">Alternatives</h3>
+  <div class="recs">
+    {% for alt in vd.alternatives %}
+    <article class="rec"><p class="rec-model">{{ alt.model }}</p><p>{{ alt.when_to_prefer }}</p>
+      {% set af = vv.alt_fits.get(alt.model) %}{% if af %}<p class="muted small">{{ af.counts.pass }} pass, {{ af.counts.fail }} fail, {{ af.counts.unknown }} no data · {{ af.tightest|join('; ') }}</p>{% endif %}</article>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if vd.open_points %}
+  <h3 style="margin:22px 0 10px">Before you quote</h3>
+  <ul class="checks" style="list-style:none;margin:0;padding:0">
+    {% for p in vd.open_points %}<li class="check-item">{{ icon('alert') }}<span>{{ p }}</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if vv.rec_fit %}
+  <h3 style="margin:22px 0 10px">All limits: {{ vv.rec_fit.model }}</h3>
+  {{ fit_table(vv.rec_fit) }}
+  {% if vv.rec_fit.ports %}<p class="muted small">Ports: {{ vv.rec_fit.ports.rule }}. {% if vv.rec_fit.ports.missing %}Missing {{ vv.rec_fit.ports.missing|join(', ') }}.{% else %}All needed ports fit.{% endif %}</p>{% endif %}
+  {% endif %}
+
+  {% if vd.rejected %}
+  <h3 style="margin:22px 0 10px">Rejected</h3>
+  <div class="table-wrap"><table class="table"><thead><tr><th scope="col">Model</th><th scope="col">Why not</th><th scope="col">Evidence</th></tr></thead><tbody>
+    {% for x in vd.rejected %}<tr><th scope="row">{{ x.model }}</th><td>{{ x.reason }}</td><td class="muted">{{ x.result_id or '' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+  <details class="more" style="margin-top:14px"><summary>{{ icon('chevron-down', 'icon-sm') }}Assumptions behind this verdict</summary>
+    <div class="body"><ul class="reasons">{% for k, val in vv.ledger.items() %}<li><strong>{{ k }}</strong>: {{ val }}</li>{% endfor %}</ul></div></details>
+</section>
+{% endif %}
+</div>
+
+<div class="panel {{ 'active' if not vv }}" id="panel-quick" data-panel="quick">
+<div class="callout callout-info no-print" style="margin-bottom:16px">{{ icon('info') }}<div>The quick result applies fixed rules to the assumptions in the Ledger tab. It is a starting point to compare with the verdict, not a recommendation.
+  <form method="post" action="/analyses/{{ a.id }}/ledger/refresh" style="display:inline;margin-left:8px"><button class="btn btn-sm" type="submit">{{ icon('refresh') }}<span>Size again</span></button></form></div></div>
 <section id="recommendation" aria-labelledby="rec-h">
   <div class="section-title"><span class="icon-bubble">{{ icon('sparkles') }}</span><h2 id="rec-h">Recommendation</h2></div>
   {% if v.cards %}
@@ -209,21 +250,6 @@
   </ul>
 </section>
 {% endif %}
-
-<section id="usage" aria-labelledby="kpi-h">
-  <div class="section-title"><span class="icon-bubble">{{ icon('activity') }}</span><h2 id="kpi-h">Current usage at a glance</h2></div>
-  {% set kpi_icons = ['activity', 'layers', 'cpu', 'list', 'box', 'plug'] %}
-  <div class="kpis">
-    {% for k in v.kpis %}
-    <div class="kpi reveal">
-      <div class="kpi-head"><span>{{ k.label }}</span><span class="icon-bubble">{{ icon(kpi_icons[loop.index0] if loop.index0 < 6 else 'activity', 'icon-sm') }}</span></div>
-      <p class="kpi-value">{{ k.value }}<span class="kpi-unit">{{ k.unit }}</span></p>
-      <p class="kpi-sub">{{ k.sub }}</p>
-    </div>
-    {% endfor %}
-  </div>
-</section>
-
 <section id="requirements" aria-labelledby="req-h">
   <div class="section-title"><span class="icon-bubble">{{ icon('gauge') }}</span><div><h2 id="req-h">Requirements: current model vs {{ rec.model if rec else 'recommendation' }}</h2><p class="muted small">Bar: how full the current {{ h.model }} is. Required: usage plus growth{% if rec %}; last columns: does the {{ rec.model }} cover it{% endif %}. Target utilization {{ v.target|num }}%.</p></div></div>
   {% set shown = v.req_rows|selectattr('interesting')|list %}
@@ -267,7 +293,74 @@
   </details>
   {% endif %}
 </section>
+{% if v.rejected %}
+<section id="rejected" aria-labelledby="rej-h">
+  <div class="section-title"><span class="icon-bubble" style="background:var(--surface-3);color:var(--muted)">{{ icon('x-circle') }}</span><h2 id="rej-h">Models that don't qualify</h2></div>
+  <details class="more" data-print-open {% if not v.cards %}open{% endif %}>
+    <summary>{{ icon('chevron-down', 'icon-sm') }}{{ v.rejected|length }} models: too large or not meeting every rule</summary>
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Model</th><th scope="col">Why not</th></tr></thead>
+      <tbody>
+      {% for c in v.rejected %}
+        <tr><th scope="row" class="nowrap">{{ c.model }}<br><span class="muted xs">{{ c.family }}</span></th><td><ul class="reasons">{% for reason in c.reasons[:4] %}<li>{{ reason }}</li>{% endfor %}{% if c.reasons|length > 4 %}<li class="muted">+{{ c.reasons|length - 4 }} more</li>{% endif %}</ul></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+</section>
+{% endif %}
+</div>
 
+<div class="panel" id="panel-ledger" data-panel="ledger">
+<section id="ledger" aria-labelledby="ledger-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('sliders') }}</span><div><h2 id="ledger-h">Assumptions ledger</h2><p class="muted small">Every input that shaped the answer. Tools and the quick result use these values. Change one and the quick result is sized again; ask the agent to re-check its verdict.</p></div></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th scope="col">Assumption</th><th scope="col">Value</th><th scope="col">Source</th><th scope="col">Why</th><th scope="col" class="no-print">Change</th></tr></thead>
+    <tbody>
+    {% for row in ledger_rows %}
+      <tr>
+        <th scope="row">{{ row.label }}</th>
+        <td><strong>{{ row.display }}</strong></td>
+        <td><span class="chip {{ 'chip-primary' if row.source in ('user', 'form') else ('chip-warn' if row.source == 'agent' else '') }}">{{ row.source }}</span></td>
+        <td class="small muted">{{ row.reason or '' }}</td>
+        <td class="no-print">
+          <form method="post" action="/analyses/{{ a.id }}/ledger/{{ row.key }}" class="inline-form">
+            {% if row.kind == 'bool' %}<select name="value" aria-label="{{ row.label }}"><option value="yes" {{ 'selected' if row.value }}>yes</option><option value="no" {{ 'selected' if not row.value }}>no</option></select>
+            {% elif row.kind == 'choice' %}<select name="value" aria-label="{{ row.label }}">{% for c in row.choices %}<option value="{{ c }}" {{ 'selected' if c == row.value }}>{{ c }}</option>{% endfor %}</select>
+            {% else %}<input name="value" type="text" value="{{ row.input }}" aria-label="{{ row.label }}" placeholder="{{ 'none' if row.kind == 'nullable_number' else ('10G_SFP+=2' if row.kind == 'ports' else '') }}">{% endif %}
+            <button class="btn btn-sm" type="submit">Save</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if ledger_history|selectattr('source', 'in', ['agent', 'user'])|list %}
+  <form method="post" action="/analyses/{{ a.id }}/ledger/undo" class="no-print" style="margin-top:12px"><button class="btn btn-sm" type="submit">{{ icon('refresh') }}<span>Undo the last change</span></button></form>
+  {% endif %}
+  <details class="more" style="margin-top:14px"><summary>{{ icon('chevron-down', 'icon-sm') }}History of changes ({{ ledger_history|length }})</summary>
+    <div class="table-wrap"><table class="table"><thead><tr><th scope="col">When</th><th scope="col">Assumption</th><th scope="col">Value</th><th scope="col">Source</th><th scope="col">Why</th></tr></thead><tbody>
+    {% for hrow in ledger_history %}<tr {% if not hrow.active %}class="muted"{% endif %}><td class="small">{{ hrow.created_at }}</td><td>{{ hrow.key }}</td><td>{{ hrow.value }}{% if not hrow.active %} (undone){% endif %}</td><td>{{ hrow.source }}</td><td class="small">{{ hrow.reason or '' }}</td></tr>{% endfor %}
+    </tbody></table></div></details>
+</section>
+</div>
+
+<div class="panel" id="panel-evidence" data-panel="evidence">
+<section id="usage" aria-labelledby="kpi-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('activity') }}</span><h2 id="kpi-h">Current usage at a glance</h2></div>
+  {% set kpi_icons = ['activity', 'layers', 'cpu', 'list', 'box', 'plug'] %}
+  <div class="kpis">
+    {% for k in v.kpis %}
+    <div class="kpi reveal">
+      <div class="kpi-head"><span>{{ k.label }}</span><span class="icon-bubble">{{ icon(kpi_icons[loop.index0] if loop.index0 < 6 else 'activity', 'icon-sm') }}</span></div>
+      <p class="kpi-value">{{ k.value }}<span class="kpi-unit">{{ k.unit }}</span></p>
+      <p class="kpi-sub">{{ k.sub }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
 <section id="interfaces" aria-labelledby="ports-h">
   <div class="section-title"><span class="icon-bubble">{{ icon('plug') }}</span><h2 id="ports-h">Interfaces</h2></div>
   <div class="grid-2">
@@ -301,26 +394,6 @@
     {% endif %}
   </div>
 </section>
-
-{% if v.rejected %}
-<section id="rejected" aria-labelledby="rej-h">
-  <div class="section-title"><span class="icon-bubble" style="background:var(--surface-3);color:var(--muted)">{{ icon('x-circle') }}</span><h2 id="rej-h">Models that don't qualify</h2></div>
-  <details class="more" data-print-open {% if not v.cards %}open{% endif %}>
-    <summary>{{ icon('chevron-down', 'icon-sm') }}{{ v.rejected|length }} models: too large or not meeting every rule</summary>
-    <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th scope="col">Model</th><th scope="col">Why not</th></tr></thead>
-      <tbody>
-      {% for c in v.rejected %}
-        <tr><th scope="row" class="nowrap">{{ c.model }}<br><span class="muted xs">{{ c.family }}</span></th><td><ul class="reasons">{% for reason in c.reasons[:4] %}<li>{{ reason }}</li>{% endfor %}{% if c.reasons|length > 4 %}<li class="muted">+{{ c.reasons|length - 4 }} more</li>{% endif %}</ul></td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  </details>
-</section>
-{% endif %}
-
 <section id="history" class="grid-2" aria-label="Load history and licenses">
   <div class="card">
     <div class="card-head"><div><h3>Load history</h3><p>From the firewall's resource monitor (reset by a reboot)</p></div></div>
@@ -343,45 +416,46 @@
     </ul>
   </div>
 </section>
-
+</div>
 <footer class="small muted">
   <p>Sources: {{ v.files_used.values()|join(', ') }}{% if h.config_source and h.config_source not in v.files_used.values() %}, {{ h.config_source }}{% endif %}.
   Capacity data: {{ v.portfolio.filename or '–' }} (PAN-OS {{ v.portfolio.panos_release or '?' }}, imported {{ v.portfolio.imported_at or '?' }}).</p>
 </footer>
 {% endblock %}
 {% block scripts %}
-{% if llm.enabled %}
 <script>
 (function () {
-  var form = document.getElementById('chat-form'); if (!form) return;
-  var log = document.getElementById('chat-log'), input = document.getElementById('chat-input');
-  var send = document.getElementById('chat-send'), undo = document.getElementById('chat-undo');
   var id = {{ a.id }};
-  function bubble(role, html) { var d = document.createElement('div'); d.className = 'bubble bubble-' + role; d.innerHTML = html; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; }
-  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+  // Panels
+  var tabs = document.querySelectorAll('.panel-tabs [data-panel]'), panels = document.querySelectorAll('.panel');
+  function show(name) {
+    var found = false;
+    panels.forEach(function (p) { var on = p.dataset.panel === name; p.classList.toggle('active', on); found = found || on; });
+    tabs.forEach(function (t) { var on = t.dataset.panel === name; t.setAttribute('aria-selected', on); t.classList.toggle('active', on); });
+    return found;
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.panel); history.replaceState(null, '', '#' + t.dataset.panel); }); });
+  var hash = location.hash.slice(1), start = document.querySelector('.panel.active');
+  var inner = { recommendation: 'quick', checks: 'quick', requirements: 'quick', rejected: 'quick', usage: 'evidence', interfaces: 'evidence', history: 'evidence', verdict: 'verdict' };
+  show(inner[hash] || (['verdict', 'quick', 'ledger', 'evidence'].indexOf(hash) >= 0 ? hash : (start ? start.dataset.panel : 'quick')));
+  // Chat
+  var log = document.getElementById('chat-log'), input = document.getElementById('chat-input');
   document.querySelectorAll('.example').forEach(function (b) { b.addEventListener('click', function () { input.value = b.dataset.text; input.focus(); }); });
-  log.scrollTop = log.scrollHeight;
-  function refreshUndo() {
-    fetch('/api/analyses/' + id + '/chat').then(function (r) { return r.json(); }).then(function (d) { undo.hidden = !d.can_undo; });
+  if (log) log.scrollTop = log.scrollHeight;
+  var after = {{ last_id }}, working = {{ 'true' if run and run.status == 'running' else 'false' }};
+  function poll() {
+    fetch('/analyses/' + id + '/agent/messages?after=' + after).then(function (r) {
+      var status = r.headers.get('X-Run-Status'), last = parseInt(r.headers.get('X-Last-Id') || '0', 10);
+      return r.text().then(function (html) { return { html: html, status: status, last: last }; });
+    }).then(function (d) {
+      if (d.last > after) {
+        var t = document.createElement('template'); t.innerHTML = d.html.trim();
+        log.appendChild(t.content); log.scrollTop = log.scrollHeight; after = d.last;
+      }
+      if (d.status === 'running') { setTimeout(poll, 1500); } else { location.reload(); }
+    }).catch(function () { setTimeout(poll, 3000); });
   }
-  refreshUndo();
-  function wait() {
-    fetch('/api/analyses/' + id + '/chat').then(function (r) { return r.json(); }).then(function (d) {
-      var pending = d.messages.some(function (m) { return m.status === 'pending'; });
-      if (pending) { setTimeout(wait, 1500); } else { location.href = '/analyses/' + id + '#assistant'; location.reload(); }
-    }).catch(function () { setTimeout(wait, 3000); });
-  }
-  if (log.querySelector('[data-status="pending"]')) { send.disabled = true; wait(); }
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var text = input.value.trim(); if (!text) return;
-    send.disabled = true;
-    fetch(form.action, { method: 'POST', headers: { 'Accept': 'application/json' }, body: new URLSearchParams({ message: text }) })
-      .then(function (r) { if (!r.ok) { return r.json().then(function (j) { throw new Error(j.detail || 'Could not send'); }); } return r.json(); })
-      .then(function () { input.value = ''; bubble('user', '<p>' + esc(text) + '</p>'); bubble('assistant', '<span class="spinner"></span> Thinking… local models can take a minute.'); wait(); })
-      .catch(function (err) { bubble('assistant bubble-error', '<p>' + esc(err.message) + '</p>'); send.disabled = false; });
-  });
+  if (working) setTimeout(poll, 1000);
 })();
 </script>
-{% endif %}
 {% endblock %}

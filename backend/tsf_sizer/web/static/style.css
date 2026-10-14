@@ -527,5 +527,23 @@ details.more > summary::-webkit-details-marker { display: none; }
 .chat-form textarea { flex: 1; resize: vertical; min-height: 52px; font: inherit; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); color: var(--ink); }
 .examples { display: flex; flex-wrap: wrap; gap: 6px 8px; }
 .examples .example { border: 0; cursor: pointer; font: inherit; }
-.chat-undo[hidden] { display: none; }
-@media print { .assistant { display: none; } }
+.step-line { display: flex; gap: 8px; align-items: center; padding: 4px 10px; font-size: .84rem; color: var(--muted); border-left: 2px solid var(--border); margin-left: 6px; }
+.step-line .icon-sm { color: var(--good); flex: none; }
+.step-line.step-err .icon-sm { color: var(--crit); }
+.step-note .icon-sm { color: var(--muted); }
+.bubble-working { color: var(--muted); }
+.bubble-working[hidden] { display: none; }
+.bubble-question { border-color: var(--primary); }
+.options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.options form { margin: 0; }
+.option { border: 0; cursor: pointer; font: inherit; }
+.bubble-verdict { border-color: var(--good); }
+.panel-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 18px; padding: 6px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); }
+.panel-tabs button { display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; min-height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; font-size: .86rem; cursor: pointer; }
+.panel-tabs button:hover { background: var(--surface-2); color: var(--ink); }
+.panel-tabs button.active { background: var(--primary-soft); color: var(--primary); }
+.panel { display: none; }
+.panel.active { display: block; }
+.inline-form { display: flex; gap: 6px; align-items: center; margin: 0; }
+.inline-form input, .inline-form select { min-width: 0; width: 100%; max-width: 220px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+@media print { .assistant { display: none; } .panel { display: block !important; } }

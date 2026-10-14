@@ -12,20 +12,38 @@ services:
       - "${TSF_SIZER_BIND:-0.0.0.0}:${TSF_SIZER_PORT:-8088}:8088"
     volumes:
       - tsf-sizer-data:/data
+      # A gateway with a private certificate: mount the CA and set TSF_SIZER_GATEWAY_CA_BUNDLE
+      # (/certs/ca.pem). A key from a file: mount it and set TSF_SIZER_GATEWAY_API_KEY_FILE.
+      # - ./certs:/certs:ro
     environment:
       # Optional login (HTTP basic auth). Set both to enable it.
       TSF_SIZER_USER: ${TSF_SIZER_USER:-}
       TSF_SIZER_PASSWORD: ${TSF_SIZER_PASSWORD:-}
       TSF_SIZER_MAX_UPLOAD_MB: ${TSF_SIZER_MAX_UPLOAD_MB:-1024}
-      # Optional AI summary (also configurable on the AI settings page, which
-      # overrides these). Provider: none | ollama | openai | anthropic.
-      TSF_SIZER_LLM_PROVIDER: ${TSF_SIZER_LLM_PROVIDER:-none}
-      TSF_SIZER_LLM_BASE_URL: ${TSF_SIZER_LLM_BASE_URL:-}
-      TSF_SIZER_LLM_MODEL: ${TSF_SIZER_LLM_MODEL:-}
-      TSF_SIZER_LLM_API_KEY: ${TSF_SIZER_LLM_API_KEY:-}
-      TSF_SIZER_LLM_TIMEOUT: ${TSF_SIZER_LLM_TIMEOUT:-180}
+      # The agent reaches its LLM through the Prisma AIRS AI Gateway. Off until a mode is set.
+      # Credentials come from the environment only (or a mounted file: NAME_FILE).
+      # See .env.example and the Settings page.
+      TSF_SIZER_LLM_MODE: ${TSF_SIZER_LLM_MODE:-off}
+      TSF_SIZER_GATEWAY_URL: ${TSF_SIZER_GATEWAY_URL:-}
+      TSF_SIZER_GATEWAY_API_KEY: ${TSF_SIZER_GATEWAY_API_KEY:-}
+      TSF_SIZER_GATEWAY_API_KEY_FILE: ${TSF_SIZER_GATEWAY_API_KEY_FILE:-}
+      TSF_SIZER_GATEWAY_MODEL: ${TSF_SIZER_GATEWAY_MODEL:-}
+      TSF_SIZER_GATEWAY_AUTH_HEADER: ${TSF_SIZER_GATEWAY_AUTH_HEADER:-}
+      TSF_SIZER_GATEWAY_AUTH_SCHEME: ${TSF_SIZER_GATEWAY_AUTH_SCHEME-Bearer}
+      TSF_SIZER_GATEWAY_HEADERS: ${TSF_SIZER_GATEWAY_HEADERS:-}
+      TSF_SIZER_GATEWAY_CHAT_PATH: ${TSF_SIZER_GATEWAY_CHAT_PATH:-}
+      TSF_SIZER_GATEWAY_CA_BUNDLE: ${TSF_SIZER_GATEWAY_CA_BUNDLE:-}
+      TSF_SIZER_GATEWAY_VERIFY_TLS: ${TSF_SIZER_GATEWAY_VERIFY_TLS:-true}
+      TSF_SIZER_GATEWAY_TIMEOUT_S: ${TSF_SIZER_GATEWAY_TIMEOUT_S:-120}
+      TSF_SIZER_GATEWAY_MAX_RETRIES: ${TSF_SIZER_GATEWAY_MAX_RETRIES:-2}
+      TSF_SIZER_GATEWAY_TOOL_MODE: ${TSF_SIZER_GATEWAY_TOOL_MODE:-auto}
+      TSF_SIZER_AGENT_MAX_STEPS: ${TSF_SIZER_AGENT_MAX_STEPS:-40}
+      # Development only (an OpenAI-compatible server, e.g. Ollama's /v1 endpoint):
+      TSF_SIZER_DIRECT_URL: ${TSF_SIZER_DIRECT_URL:-}
+      TSF_SIZER_DIRECT_MODEL: ${TSF_SIZER_DIRECT_MODEL:-}
+      TSF_SIZER_DIRECT_API_KEY: ${TSF_SIZER_DIRECT_API_KEY:-}
     extra_hosts:
-      # Lets the container reach an Ollama / LM Studio running on this machine
+      # Lets the container reach a service running on this machine (development mode)
       # as http://host.docker.internal:<port> (built in on Docker Desktop).
       - "host.docker.internal:host-gateway"
     security_opt:
@@ -34,27 +52,5 @@ services:
       - ALL
     restart: unless-stopped
 
-  # Optional: Ollama in a container next to the app. Start with
-  #   docker compose --profile ollama up -d
-  #   docker compose exec ollama ollama pull llama3.1:8b
-  # and use server URL http://ollama:11434 on the AI settings page.
-  # Not published on a host port: only tsf-sizer can reach it.
-  ollama:
-    image: ollama/ollama:latest
-    container_name: tsf-sizer-ollama
-    profiles: ["ollama"]
-    volumes:
-      - ollama-models:/root/.ollama
-    restart: unless-stopped
-    # NVIDIA GPU (needs the NVIDIA Container Toolkit): uncomment
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
 volumes:
   tsf-sizer-data:
-  ollama-models:

@@ -1,0 +1,1445 @@
+{
+ "name": "synthetic: PA-3430 to a larger model",
+ "result": {
+  "source": "techsupport_sample.txt",
+  "files_used": {
+   "techsupport": "techsupport_sample.txt"
+  },
+  "summary": {
+   "model": "PA-3430",
+   "family": "3400",
+   "panos": "11.1.6",
+   "uptime_days": 45.1,
+   "ha": {
+    "enabled": true,
+    "mode": "Active-Passive",
+    "local_state": "active",
+    "ha1_interface": "ha1-a",
+    "ha1_backup_interface": null,
+    "ha2_interface": "hsci",
+    "peer_model": "PA-3430"
+   },
+   "licenses_active": [
+    "Threat Prevention"
+   ],
+   "licenses_expired": [
+    "WildFire License"
+   ],
+   "sizing_basis": "threat_prevention",
+   "poe": {
+    "supported": null,
+    "ports_in_use": [],
+    "parsed": false
+   },
+   "config_source": "uploaded config XML",
+   "panorama_managed": true,
+   "metrics": {
+    "perf.throughput_snapshot_mbps": {
+     "value": 2400.0,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": "Mbps",
+     "note": null
+    },
+    "perf.cps_snapshot": {
+     "value": 9000,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": "cps",
+     "note": null
+    },
+    "perf.packet_rate_snapshot": {
+     "value": 450000,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": "pps",
+     "note": null
+    },
+    "perf.sessions_snapshot": {
+     "value": 180000,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": "sessions",
+     "note": null
+    },
+    "perf.sessions": {
+     "value": 400000,
+     "kind": "estimate",
+     "source": "show running resource-monitor",
+     "unit": "sessions",
+     "note": "session table peaked at 16% of 2500000 (whole percents, so this is an upper estimate)"
+    },
+    "perf.dp_cpu_peak_pct": {
+     "value": 73,
+     "kind": "peak",
+     "source": "show running resource-monitor",
+     "unit": "%",
+     "note": "highest per-core maximum, period: week"
+    },
+    "perf.throughput_avg_since_boot_mbps": {
+     "value": 8.0,
+     "kind": "average",
+     "source": "show interface <port> (rx-bytes) / uptime",
+     "unit": "Mbps",
+     "note": "average over the whole uptime, not a peak"
+    },
+    "config.security_rules": {
+     "value": 4,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": "running policy shows 3"
+    },
+    "config.nat_rules": {
+     "value": 3,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": "running policy shows 2"
+    },
+    "config.decryption_rules": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.dos_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.nat_rules_static": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.nat_rules_dip": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.nat_rules_dipp": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.ipsec_tunnels": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.ike_gateways": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "state.routes_v4": {
+     "value": 1200,
+     "kind": "count",
+     "source": "show advanced-routing resource",
+     "unit": null,
+     "note": null
+    },
+    "state.routes_v6": {
+     "value": 30,
+     "kind": "count",
+     "source": "show advanced-routing resource",
+     "unit": null,
+     "note": null
+    },
+    "state.gp_users": {
+     "value": 37,
+     "kind": "snapshot",
+     "source": "show global-protect-gateway statistics",
+     "unit": null,
+     "note": null
+    },
+    "state.dag_ips": {
+     "value": 250,
+     "kind": "count",
+     "source": "show object registered-ip all option count",
+     "unit": null,
+     "note": null
+    },
+    "config.zones": {
+     "value": 4,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.logical_interfaces": {
+     "value": 13,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.tunnel_interfaces": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.aggregate_interfaces": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.vsys": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.address_objects": {
+     "value": 5,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.address_groups": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.max_address_group_members": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.service_objects": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.service_groups": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.fqdn_objects": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.edl_lists": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.security_profiles": {
+     "value": 4,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.custom_apps": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.custom_url_categories": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.url_list_entries": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.virtual_routers": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.vwires": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.shared_gateways": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.max_aggregate_members": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.routing_peers": {
+     "value": 2,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.dhcp_relay_interfaces": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.gp_gateways": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.schedules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.app_override_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.auth_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.pbf_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.qos_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.tunnel_inspection_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.sdwan_rules": {
+     "value": 0,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.edl_lists_ip": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "config.edl_lists_domain": {
+     "value": 1,
+     "kind": "count",
+     "source": "uploaded config XML",
+     "unit": null,
+     "note": null
+    },
+    "feature.ha_active_passive": {
+     "value": true,
+     "kind": "count",
+     "source": "show high-availability all",
+     "unit": null,
+     "note": null
+    },
+    "feature.ha_active_active": {
+     "value": false,
+     "kind": "count",
+     "source": "show high-availability all",
+     "unit": null,
+     "note": null
+    },
+    "feature.gtp": {
+     "value": false,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": null,
+     "note": null
+    },
+    "feature.sctp": {
+     "value": false,
+     "kind": "snapshot",
+     "source": "show session info",
+     "unit": null,
+     "note": null
+    },
+    "feature.lre_routing": {
+     "value": false,
+     "kind": "count",
+     "source": "show system info",
+     "unit": null,
+     "note": null
+    }
+   },
+   "ports": [
+    {
+     "name": "ethernet1/1",
+     "speed_class": "10G_SFP+",
+     "role": "traffic",
+     "zone": "untrust",
+     "runtime_speed": "10000",
+     "state": "up"
+    },
+    {
+     "name": "ethernet1/2",
+     "speed_class": "10G_RJ45",
+     "role": "traffic",
+     "zone": null,
+     "runtime_speed": "1000",
+     "state": "up"
+    },
+    {
+     "name": "ethernet1/3",
+     "speed_class": "unknown",
+     "role": "unused",
+     "zone": null,
+     "runtime_speed": "ukn",
+     "state": "down"
+    }
+   ],
+   "port_counts": {
+    "10G_SFP+": 1,
+    "10G_RJ45": 1
+   },
+   "resource_history": {
+    "second": {
+     "dp_cpu_peak_pct": 25,
+     "dp_cpu_avg_pct": null,
+     "samples_with_data": 2,
+     "session_util_peak_pct": 7,
+     "packet_buffer_peak_pct": 3
+    },
+    "minute": {
+     "dp_cpu_peak_pct": 31,
+     "dp_cpu_avg_pct": 19.7,
+     "samples_with_data": 2,
+     "session_util_peak_pct": 8,
+     "packet_buffer_peak_pct": 5
+    },
+    "hour": {
+     "dp_cpu_peak_pct": 58,
+     "dp_cpu_avg_pct": 20.2,
+     "samples_with_data": 2,
+     "session_util_peak_pct": 12,
+     "packet_buffer_peak_pct": null
+    },
+    "day": {
+     "dp_cpu_peak_pct": 61,
+     "dp_cpu_avg_pct": 25.0,
+     "samples_with_data": 1,
+     "session_util_peak_pct": 14,
+     "packet_buffer_peak_pct": null
+    },
+    "week": {
+     "dp_cpu_peak_pct": 73,
+     "dp_cpu_avg_pct": 23.2,
+     "samples_with_data": 2,
+     "session_util_peak_pct": 16,
+     "packet_buffer_peak_pct": null
+    }
+   },
+   "warnings": [
+    "Only 2 week(s) of resource history available (13 possible).",
+    "Throughput, CPS and packet rate are snapshots at TSF time (Thu Jan 15 10:00:00 2026); enter the known peak if the TSF was taken off-peak.",
+    "Expired licenses: WildFire License",
+    "Resource-pressure counters are non-zero: session_alloc_failure=12",
+    "Decryption rules are configured: size on decryption throughput, or confirm with the official sizing tool.",
+    "Panorama-managed firewall but the merged running config was not used: pushed objects and rules may be missing. Use .merged-running-config.xml."
+   ]
+  },
+  "facts": {
+   "resource_series": {
+    "second": {
+     "cpu": [
+      [
+       null,
+       20,
+       25,
+       22
+      ],
+      [
+       null,
+       21,
+       24,
+       23
+      ]
+     ],
+     "util": {
+      "session": [
+       7,
+       7,
+       7
+      ],
+      "packet_buffer": [
+       2,
+       3,
+       2
+      ]
+     }
+    },
+    "minute": {
+     "cpu": [
+      [
+       null,
+       null,
+       20,
+       30,
+       22,
+       31,
+       21,
+       29
+      ],
+      [
+       null,
+       null,
+       18,
+       25,
+       19,
+       26,
+       18,
+       27
+      ]
+     ],
+     "util": {
+      "session_ave": [
+       7,
+       7
+      ],
+      "session_max": [
+       8,
+       8
+      ],
+      "packet_buffer_ave": [
+       2,
+       2
+      ],
+      "packet_buffer_max": [
+       5,
+       4
+      ]
+     }
+    },
+    "hour": {
+     "cpu": [
+      [
+       null,
+       null,
+       30,
+       55,
+       31,
+       58,
+       29,
+       54
+      ],
+      [
+       null,
+       null,
+       10,
+       20,
+       11,
+       21,
+       10,
+       19
+      ]
+     ],
+     "util": {
+      "session_ave": [
+       9,
+       5
+      ],
+      "session_max": [
+       12,
+       6
+      ]
+     }
+    },
+    "day": {
+     "cpu": [
+      [
+       null,
+       null,
+       25,
+       60,
+       26,
+       61,
+       24,
+       59
+      ]
+     ],
+     "util": {
+      "session_max": [
+       14
+      ]
+     }
+    },
+    "week": {
+     "cpu": [
+      [
+       null,
+       null,
+       24,
+       71,
+       25,
+       73,
+       23,
+       70
+      ],
+      [
+       null,
+       null,
+       22,
+       65,
+       23,
+       66,
+       22,
+       64
+      ],
+      [
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null
+      ]
+     ],
+     "util": {
+      "session_max": [
+       16,
+       15,
+       0
+      ]
+     }
+    }
+   },
+   "licenses": [
+    {
+     "feature": "Threat Prevention",
+     "expires": "January 01, 2027",
+     "expired": false
+    },
+    {
+     "feature": "WildFire License",
+     "expires": "January 01, 2025",
+     "expired": true
+    }
+   ],
+   "counters_of_interest": {
+    "session_alloc_failure": 12
+   }
+  },
+  "config": {
+   "panos_version": "11.1.0",
+   "panorama_managed": true,
+   "vsys": 2,
+   "counts": {
+    "address_objects": 5,
+    "fqdn_objects": 2,
+    "address_groups": 2,
+    "service_objects": 1,
+    "service_groups": 1,
+    "custom_apps": 1,
+    "application_groups": 0,
+    "application_filters": 0,
+    "tags": 0,
+    "schedules": 0,
+    "regions": 0,
+    "dynamic_user_groups": 0,
+    "profile_groups": 0,
+    "edl_lists": 2,
+    "edl_lists_ip": 1,
+    "edl_lists_domain": 1,
+    "security_profiles": 4,
+    "custom_url_categories": 1,
+    "url_list_entries": 2,
+    "zones": 4,
+    "security_rules": 4,
+    "nat_rules": 3,
+    "nat_rules_dipp": 1,
+    "nat_rules_dip": 1,
+    "nat_rules_static": 1,
+    "decryption_rules": 1,
+    "app_override_rules": 0,
+    "auth_rules": 0,
+    "dos_rules": 0,
+    "pbf_rules": 0,
+    "qos_rules": 0,
+    "tunnel_inspection_rules": 0,
+    "sdwan_rules": 0,
+    "decryption_profiles": 1,
+    "max_address_group_members": 2,
+    "aggregate_interfaces": 1,
+    "max_aggregate_members": 2,
+    "tunnel_interfaces": 2,
+    "logical_interfaces": 13,
+    "vwires": 1,
+    "virtual_routers": 1,
+    "static_routes": 3,
+    "routing_peers": 2,
+    "ike_gateways": 2,
+    "ipsec_tunnels": 2,
+    "gp_gateways": 1,
+    "dhcp_relay_interfaces": 1,
+    "shared_gateways": 0,
+    "vsys": 2
+   },
+   "by_vsys": {
+    "shared": {
+     "address_objects": 1,
+     "fqdn_objects": 1,
+     "address_groups": 0,
+     "service_objects": 1,
+     "service_groups": 0,
+     "custom_apps": 0,
+     "application_groups": 0,
+     "application_filters": 0,
+     "tags": 0,
+     "schedules": 0,
+     "regions": 0,
+     "dynamic_user_groups": 0,
+     "profile_groups": 0,
+     "edl_lists": 0
+    },
+    "vsys1": {
+     "address_objects": 3,
+     "fqdn_objects": 1,
+     "address_groups": 2,
+     "service_objects": 0,
+     "service_groups": 1,
+     "custom_apps": 1,
+     "application_groups": 0,
+     "application_filters": 0,
+     "tags": 0,
+     "schedules": 0,
+     "regions": 0,
+     "dynamic_user_groups": 0,
+     "profile_groups": 0,
+     "edl_lists": 2,
+     "edl_lists_ip": 1,
+     "edl_lists_domain": 1,
+     "security_profiles": 4,
+     "custom_url_categories": 1,
+     "url_list_entries": 2,
+     "zones": 3,
+     "security_rules": 3,
+     "nat_rules": 3,
+     "nat_rules_dipp": 1,
+     "nat_rules_dip": 1,
+     "nat_rules_static": 1,
+     "decryption_rules": 1,
+     "app_override_rules": 0,
+     "auth_rules": 0,
+     "dos_rules": 0,
+     "pbf_rules": 0,
+     "qos_rules": 0,
+     "tunnel_inspection_rules": 0,
+     "sdwan_rules": 0,
+     "decryption_profiles": 1
+    },
+    "vsys2": {
+     "address_objects": 1,
+     "fqdn_objects": 0,
+     "address_groups": 0,
+     "service_objects": 0,
+     "service_groups": 0,
+     "custom_apps": 0,
+     "application_groups": 0,
+     "application_filters": 0,
+     "tags": 0,
+     "schedules": 0,
+     "regions": 0,
+     "dynamic_user_groups": 0,
+     "profile_groups": 0,
+     "edl_lists": 0,
+     "zones": 1,
+     "security_rules": 1,
+     "nat_rules": 0,
+     "decryption_rules": 0,
+     "app_override_rules": 0,
+     "auth_rules": 0,
+     "dos_rules": 0,
+     "pbf_rules": 0,
+     "qos_rules": 0,
+     "tunnel_inspection_rules": 0,
+     "sdwan_rules": 0,
+     "decryption_profiles": 0
+    }
+   },
+   "profiles_by_type": {
+    "virus": 1,
+    "spyware": 2,
+    "vulnerability": 0,
+    "url-filtering": 1,
+    "file-blocking": 0,
+    "wildfire-analysis": 0,
+    "data-filtering": 0,
+    "dns-security": 0
+   },
+   "interfaces": {
+    "ethernet_layer3": 1,
+    "subinterfaces": 3,
+    "ethernet_aggregate_group": 2,
+    "ethernet_virtual_wire": 2,
+    "ethernet_ha": 1,
+    "aggregate_ethernet": 1,
+    "tunnel": 2,
+    "vlan": 0,
+    "loopback": 1
+   },
+   "ha": {
+    "enabled": true,
+    "mode": "active-passive",
+    "ports": {
+     "ha1": "ha1-a",
+     "ha2": "ethernet1/8"
+    }
+   },
+   "notes": [
+    "Panorama-managed: counts include pushed template and device-group config when the merged running config is used."
+   ]
+  },
+  "usage": {
+   "model": "PA-3430",
+   "document_id": 1,
+   "rows": [
+    {
+     "metric": "perf.throughput_snapshot_mbps",
+     "attribute": "Threat prevention throughput 64k (appmix)",
+     "observed": 2400.0,
+     "observed_kind": "snapshot",
+     "capacity": 15.0,
+     "capacity_raw": "15.0 Gbps",
+     "utilization_pct": 16.0,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "perf.throughput_avg_since_boot_mbps",
+     "attribute": "Threat prevention throughput 64k (appmix)",
+     "observed": 8.0,
+     "observed_kind": "average",
+     "capacity": 15.0,
+     "capacity_raw": "15.0 Gbps",
+     "utilization_pct": 0.1,
+     "unconfirmed": false,
+     "note": "average over the whole uptime, not a peak"
+    },
+    {
+     "metric": "perf.cps_snapshot",
+     "attribute": "Connections per second",
+     "observed": 9000,
+     "observed_kind": "snapshot",
+     "capacity": 240000.0,
+     "capacity_raw": "240000",
+     "utilization_pct": 3.8,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "config.security_rules",
+     "attribute": "Security rulebase",
+     "observed": 4,
+     "observed_kind": "count",
+     "capacity": 30000.0,
+     "capacity_raw": "30000",
+     "utilization_pct": 0.0,
+     "unconfirmed": true,
+     "note": "running policy shows 3"
+    },
+    {
+     "metric": "config.logical_interfaces",
+     "attribute": "Max interfaces (ifNet)",
+     "observed": 13,
+     "observed_kind": "count",
+     "capacity": 4500.0,
+     "capacity_raw": "4500",
+     "utilization_pct": 0.3,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "config.tunnel_interfaces",
+     "attribute": "Tunnel interfaces",
+     "observed": 2,
+     "observed_kind": "count",
+     "capacity": 4000.0,
+     "capacity_raw": "4000",
+     "utilization_pct": 0.1,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "config.vsys",
+     "attribute": "Max virtual systems",
+     "observed": 2,
+     "observed_kind": "count",
+     "capacity": 11.0,
+     "capacity_raw": "11",
+     "utilization_pct": 18.2,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "config.address_objects",
+     "attribute": "Max address entries",
+     "observed": 5,
+     "observed_kind": "count",
+     "capacity": 30000.0,
+     "capacity_raw": "30000",
+     "utilization_pct": 0.0,
+     "unconfirmed": false,
+     "note": null
+    },
+    {
+     "metric": "config.address_groups",
+     "attribute": "Max address groups",
+     "observed": 2,
+     "observed_kind": "count",
+     "capacity": 15000.0,
+     "capacity_raw": "15000",
+     "utilization_pct": 0.0,
+     "unconfirmed": false,
+     "note": null
+    }
+   ],
+   "ports_needed": {
+    "10G_SFP+": 1,
+    "10G_RJ45": 1
+   },
+   "ports_available": {
+    "100G_QSFP28": 2,
+    "10G_SFP+": 10
+   },
+   "warnings": [
+    "Peak dataplane CPU in available history: 73% (highest per-core maximum, period: week)."
+   ]
+  },
+  "sizing": {
+   "params": {
+    "growth_pct_per_year": 20.0,
+    "years": 3,
+    "target_util_pct": 70.0,
+    "peak_throughput_mbps": null,
+    "peak_cps": null,
+    "peak_sessions": null,
+    "port_rule": "all",
+    "include_npi": false,
+    "include_superseded": false,
+    "need_poe": false,
+    "max_size_factor": 5.0,
+    "right_size": false,
+    "only_models": [],
+    "port_drop": [],
+    "port_add": {},
+    "soft_metrics": [],
+    "exclude_models": [],
+    "growth_factor": 1.728
+   },
+   "current_model": "PA-3430",
+   "current_in_portfolio": true,
+   "document_id": 1,
+   "requirements": [
+    {
+     "metric": "perf.throughput_threat_gbps",
+     "label": "Throughput (threat prevention)",
+     "observed": 2.4,
+     "observed_basis": "snapshot",
+     "required": 5.925,
+     "current_capacity": 15.0,
+     "unit": "Gbps",
+     "is_perf": true
+    },
+    {
+     "metric": "perf.cps",
+     "label": "Connections per second",
+     "observed": 9000,
+     "observed_basis": "snapshot",
+     "required": 22218,
+     "current_capacity": 240000.0,
+     "unit": "cps",
+     "is_perf": true
+    },
+    {
+     "metric": "perf.sessions",
+     "label": "Concurrent sessions",
+     "observed": 400000,
+     "observed_basis": "estimated peak",
+     "required": 987429,
+     "current_capacity": null,
+     "unit": "sessions",
+     "is_perf": true
+    },
+    {
+     "metric": "config.security_rules",
+     "label": "Security rulebase",
+     "observed": 4,
+     "observed_basis": "count",
+     "required": 7,
+     "current_capacity": 30000.0,
+     "unit": null,
+     "is_perf": false
+    },
+    {
+     "metric": "config.logical_interfaces",
+     "label": "Max interfaces (ifNet)",
+     "observed": 13,
+     "observed_basis": "count",
+     "required": 23,
+     "current_capacity": 4500.0,
+     "unit": null,
+     "is_perf": false
+    },
+    {
+     "metric": "config.tunnel_interfaces",
+     "label": "Tunnel interfaces",
+     "observed": 2,
+     "observed_basis": "count",
+     "required": 4,
+     "current_capacity": 4000.0,
+     "unit": null,
+     "is_perf": false
+    },
+    {
+     "metric": "config.vsys",
+     "label": "Max virtual systems",
+     "observed": 2,
+     "observed_basis": "count",
+     "required": 2,
+     "current_capacity": 11.0,
+     "unit": null,
+     "is_perf": false
+    },
+    {
+     "metric": "config.address_objects",
+     "label": "Max address entries",
+     "observed": 5,
+     "observed_basis": "count",
+     "required": 9,
+     "current_capacity": 30000.0,
+     "unit": null,
+     "is_perf": false
+    },
+    {
+     "metric": "config.address_groups",
+     "label": "Max address groups",
+     "observed": 2,
+     "observed_basis": "count",
+     "required": 4,
+     "current_capacity": 15000.0,
+     "unit": null,
+     "is_perf": false
+    }
+   ],
+   "ports_needed": {
+    "rule": "the current PA-3430's full port layout",
+    "traffic": {
+     "10G_SFP+": 1,
+     "10G_RJ45": 1
+    },
+    "ha": {},
+    "baseline": {
+     "100G_QSFP28": 2,
+     "10G_SFP+": 10
+    }
+   },
+   "recommended": null,
+   "alternatives": [],
+   "rejected": [
+    {
+     "model": "PA-540",
+     "family": "PA-500",
+     "passes": false,
+     "checks": [
+      {
+       "metric": "perf.throughput_threat_gbps",
+       "label": "Throughput (threat prevention)",
+       "required": 5.925,
+       "current_capacity": 15.0,
+       "candidate_capacity": 1.2,
+       "candidate_raw": "1.2 Gbps",
+       "status": "fail",
+       "reason": "needs 5.925, has 1.2; not more than current model (15)",
+       "headroom_pct": -393.7,
+       "unconfirmed": false
+      },
+      {
+       "metric": "perf.cps",
+       "label": "Connections per second",
+       "required": 22218,
+       "current_capacity": 240000.0,
+       "candidate_capacity": 15000.0,
+       "candidate_raw": "15000",
+       "status": "fail",
+       "reason": "needs 22,218, has 15,000; not more than current model (240,000)",
+       "headroom_pct": -48.1,
+       "unconfirmed": false
+      },
+      {
+       "metric": "perf.sessions",
+       "label": "Concurrent sessions",
+       "required": 987429,
+       "current_capacity": null,
+       "candidate_capacity": null,
+       "candidate_raw": null,
+       "status": "unknown",
+       "reason": "no value in the capacity sheet",
+       "headroom_pct": null,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.security_rules",
+       "label": "Security rulebase",
+       "required": 7,
+       "current_capacity": 30000.0,
+       "candidate_capacity": 1500.0,
+       "candidate_raw": "1500",
+       "status": "fail",
+       "reason": "below current model (30,000)",
+       "headroom_pct": 99.5,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.logical_interfaces",
+       "label": "Max interfaces (ifNet)",
+       "required": 23,
+       "current_capacity": 4500.0,
+       "candidate_capacity": 1024.0,
+       "candidate_raw": "1024",
+       "status": "fail",
+       "reason": "below current model (4,500)",
+       "headroom_pct": 97.8,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.tunnel_interfaces",
+       "label": "Tunnel interfaces",
+       "required": 4,
+       "current_capacity": 4000.0,
+       "candidate_capacity": null,
+       "candidate_raw": null,
+       "status": "unknown",
+       "reason": "no value in the capacity sheet",
+       "headroom_pct": null,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.vsys",
+       "label": "Max virtual systems",
+       "required": 2,
+       "current_capacity": 11.0,
+       "candidate_capacity": null,
+       "candidate_raw": "N/A",
+       "status": "fail",
+       "reason": "not supported",
+       "headroom_pct": null,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.address_objects",
+       "label": "Max address entries",
+       "required": 9,
+       "current_capacity": 30000.0,
+       "candidate_capacity": 4000.0,
+       "candidate_raw": "4K",
+       "status": "fail",
+       "reason": "below current model (30,000)",
+       "headroom_pct": 99.8,
+       "unconfirmed": true
+      },
+      {
+       "metric": "config.address_groups",
+       "label": "Max address groups",
+       "required": 4,
+       "current_capacity": 15000.0,
+       "candidate_capacity": 500.0,
+       "candidate_raw": "500",
+       "status": "fail",
+       "reason": "below current model (15,000)",
+       "headroom_pct": 99.2,
+       "unconfirmed": false
+      }
+     ],
+     "failures": [
+      "Throughput (threat prevention): needs 5.925, has 1.2; not more than current model (15)",
+      "Connections per second: needs 22,218, has 15,000; not more than current model (240,000)",
+      "Security rulebase: below current model (30,000)",
+      "Max interfaces (ifNet): below current model (4,500)",
+      "Max virtual systems: not supported",
+      "Max address entries: below current model (30,000)",
+      "Max address groups: below current model (15,000)",
+      "Ports: missing 2x 100G_QSFP28, 10x 10G_SFP+"
+     ],
+     "port_plan": {
+      "assignment": {},
+      "spare": {
+       "1G_RJ45": 8
+      },
+      "needed": {
+       "100G_QSFP28": 2,
+       "10G_SFP+": 10
+      },
+      "available": {
+       "1G_RJ45": 8
+      },
+      "dedicated_ha": false
+     },
+     "min_headroom_pct": null,
+     "tightest": [],
+     "unconfirmed_used": [],
+     "extra_variants": [],
+     "poe_ports": 0,
+     "too_large": null,
+     "unknown_features": [
+      "ha active passive"
+     ],
+     "notices": [],
+     "sort_key": 1.2,
+     "tie_key": [
+      0.0,
+      15000.0
+     ]
+    },
+    {
+     "model": "PA-7500",
+     "family": "PA-7500",
+     "passes": false,
+     "checks": [
+      {
+       "metric": "perf.throughput_threat_gbps",
+       "label": "Throughput (threat prevention)",
+       "required": 5.925,
+       "current_capacity": 15.0,
+       "candidate_capacity": 1440.0,
+       "candidate_raw": "1.44 Tbps",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 99.6,
+       "unconfirmed": false
+      },
+      {
+       "metric": "perf.cps",
+       "label": "Connections per second",
+       "required": 22218,
+       "current_capacity": 240000.0,
+       "candidate_capacity": 7200000.0,
+       "candidate_raw": "7200000",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 99.7,
+       "unconfirmed": false
+      },
+      {
+       "metric": "perf.sessions",
+       "label": "Concurrent sessions",
+       "required": 987429,
+       "current_capacity": null,
+       "candidate_capacity": null,
+       "candidate_raw": null,
+       "status": "unknown",
+       "reason": "no value in the capacity sheet",
+       "headroom_pct": null,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.security_rules",
+       "label": "Security rulebase",
+       "required": 7,
+       "current_capacity": 30000.0,
+       "candidate_capacity": 65000.0,
+       "candidate_raw": "65000",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 100.0,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.logical_interfaces",
+       "label": "Max interfaces (ifNet)",
+       "required": 23,
+       "current_capacity": 4500.0,
+       "candidate_capacity": 8400.0,
+       "candidate_raw": "8400",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 99.7,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.tunnel_interfaces",
+       "label": "Tunnel interfaces",
+       "required": 4,
+       "current_capacity": 4000.0,
+       "candidate_capacity": 4069.0,
+       "candidate_raw": "4069",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 99.9,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.vsys",
+       "label": "Max virtual systems",
+       "required": 2,
+       "current_capacity": 11.0,
+       "candidate_capacity": 225.0,
+       "candidate_raw": "225",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 99.1,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.address_objects",
+       "label": "Max address entries",
+       "required": 9,
+       "current_capacity": 30000.0,
+       "candidate_capacity": 160000.0,
+       "candidate_raw": "160000",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 100.0,
+       "unconfirmed": false
+      },
+      {
+       "metric": "config.address_groups",
+       "label": "Max address groups",
+       "required": 4,
+       "current_capacity": 15000.0,
+       "candidate_capacity": 80000.0,
+       "candidate_raw": "80000",
+       "status": "pass",
+       "reason": null,
+       "headroom_pct": 100.0,
+       "unconfirmed": false
+      }
+     ],
+     "failures": [
+      "Ports: missing 2x 100G_QSFP28, 10x 10G_SFP+"
+     ],
+     "port_plan": {
+      "assignment": {},
+      "spare": {},
+      "needed": {
+       "100G_QSFP28": 2,
+       "10G_SFP+": 10
+      },
+      "available": {},
+      "dedicated_ha": false
+     },
+     "min_headroom_pct": 99.1,
+     "tightest": [
+      "Max virtual systems (99.1% headroom)",
+      "Throughput (threat prevention) (99.6% headroom)",
+      "Connections per second (99.7% headroom)"
+     ],
+     "unconfirmed_used": [],
+     "extra_variants": [],
+     "poe_ports": 0,
+     "too_large": "1,440 Gbps is more than 5x the current PA-3430's 15 Gbps (cap 75 Gbps)",
+     "unknown_features": [
+      "ha active passive"
+     ],
+     "notices": [],
+     "sort_key": 1440.0,
+     "tie_key": [
+      0.0,
+      7200000.0
+     ]
+    }
+   ],
+   "too_large": [],
+   "excluded_families": {
+    "PA-400": "PA-500"
+   },
+   "size_cap_gbps": 75.0,
+   "need_poe": false,
+   "notes": [
+    "Throughput requirement is based on a TSF snapshot value; enter the known peak for a reliable result.",
+    "No quotable model meets every rule; see the rejected list.",
+    "PA-400 series left out: superseded by the PA-500 series. Tick 'Include previous-generation models' to consider it."
+   ]
+  },
+  "portfolio": null,
+  "portfolio_error": null,
+  "generated_at": "synthetic"
+ },
+ "params": {},
+ "answers": [
+  "Like for like"
+ ],
+ "expect": {
+  "models_any_of": [
+   "PA-5550"
+  ],
+  "keywords_any": [
+   "snapshot",
+   "peak"
+  ],
+  "max_steps": 30
+ }
+}

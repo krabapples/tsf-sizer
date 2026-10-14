@@ -27,7 +27,7 @@ Stop with `docker compose down`. Analyses and the portfolio survive restarts (Do
 | `TSF_SIZER_MAX_UPLOAD_MB` | `1024` | Upload limit per file |
 | `TSF_SIZER_PORT` | `8088` | Port on your machine (if 8088 is taken too) |
 | `TSF_SIZER_BIND` | `0.0.0.0` | Address to listen on. `0.0.0.0`: reachable from the network; `127.0.0.1`: this machine only |
-| `TSF_SIZER_LLM_PROVIDER`, `_MODEL`, `_BASE_URL`, `_API_KEY`, `_TIMEOUT` | off | Optional AI summary, see below |
+| `TSF_SIZER_LLM_MODE` and `TSF_SIZER_GATEWAY_*` | off | The agent's LLM through the AI gateway, see below |
 
 By default the app listens on every network address of the machine, so colleagues can open it at `http://<machine-ip>:8088` (e.g. `http://192.168.2.170:8088`). It handles customer data and has **no login unless you set one**: put this in a `.env` file next to `docker-compose.yml`, then run `docker compose up -d`:
 
@@ -38,63 +38,47 @@ TSF_SIZER_PASSWORD=choose-a-password
 
 To keep the app reachable from this machine only, add `TSF_SIZER_BIND=127.0.0.1`. If other machines still cannot connect, check the host's firewall (e.g. `sudo ufw allow 8088/tcp`). For a shared team server, put a reverse proxy with HTTPS in front of it.
 
-### AI summary with a local LLM (optional)
+### The agent (optional, needs an LLM through the AI gateway)
 
-The sizing itself never uses an LLM: it is rule-based and computed in the container. Optionally, an LLM writes a short justification (summary, why this model, alternatives, checks before quoting) at the top of the report. Configure it on the **AI settings** page or with environment variables. Supported:
+Without an LLM the app gives a **quick result**: fixed rules applied to your assumptions, as before. With an LLM, every analysis also starts an **agent** that reasons with you before reaching a verdict:
 
-| Provider | Server URL (default) | Notes |
+1. It reads the evidence from the TSF (usage, CPU history, resource counters, licenses, ports, HA) and tells you what it sees.
+2. It asks the questions whose answer changes the result (like for like or a smaller box? optics? a known peak?), with options and a default.
+3. It investigates what does not fit (CPU peaks, allocation failures, expired licenses, ports with link up and no configuration).
+4. It checks every candidate with deterministic **tools**: requirements, limit by limit with headroom, ports, features, PoE. The tools return facts and "no data"; they never decide.
+5. It submits a **verdict**: a recommendation (or none), alternatives, rejected models with the limit that blocks them, open points for before you quote, and a confidence level. A **verifier** checks that every model was checked and every figure in the text matches a tool result. Claims it cannot match are shown as *unverified*.
+6. You challenge it: correct an assumption, ask why, ask for a what-if. Each verdict is kept as a version.
+
+The analysis page has the conversation on top and four tabs: **Verdict**, **Quick result**, **Ledger** (every assumption with its source and reason: form, you, agent or default; editable, with undo) and **Evidence** (what was read from the TSF).
+
+The team's sizing policy (70 % target utilization, "match or beat the current model" versus "usage only", variants, ports, known exceptions such as PA-800 and the Legacy Routing Engine) is a **playbook**, plain text you can edit on the **Settings** page. The agent applies it, may deviate when it explains why, and records the deviation in the ledger.
+
+**Connecting the gateway.** All model calls go through the Prisma AIRS AI Gateway, an OpenAI-style endpoint. Set the variables on the container (`.env`, see `.env.example`); credentials are never entered in the UI or stored:
+
+```bash
+TSF_SIZER_LLM_MODE=gateway
+TSF_SIZER_GATEWAY_URL=https://gateway.example.com/v1
+TSF_SIZER_GATEWAY_API_KEY=...            # or TSF_SIZER_GATEWAY_API_KEY_FILE=/run/secrets/key
+TSF_SIZER_GATEWAY_MODEL=model-name-as-the-gateway-exposes-it
+```
+
+| Variable | Default | Purpose |
 |---|---|---|
-| **Ollama** (recommended for customer data) | `http://host.docker.internal:11434` | Runs locally; nothing leaves your network |
-| **OpenAI-compatible** | `http://host.docker.internal:1234/v1` | LM Studio, vLLM, LocalAI, llama.cpp server, or a hosted API; include `/v1` |
-| **Anthropic** | `https://api.anthropic.com` | Hosted; needs `TSF_SIZER_LLM_API_KEY` |
+| `TSF_SIZER_LLM_MODE` | `off` | `gateway`, `direct` (development: any OpenAI-compatible server via `TSF_SIZER_DIRECT_URL`, `_MODEL`, `_API_KEY`) or `off` |
+| `TSF_SIZER_GATEWAY_URL` | | Base URL including the version path |
+| `TSF_SIZER_GATEWAY_API_KEY` | | The key issued for this application (secret) |
+| `TSF_SIZER_GATEWAY_MODEL` | | Model name as the gateway exposes it |
+| `TSF_SIZER_GATEWAY_AUTH_HEADER`, `_AUTH_SCHEME` | `Authorization`, `Bearer` | Header that carries the key and its prefix (empty scheme = key as is) |
+| `TSF_SIZER_GATEWAY_HEADERS` | | Extra headers as JSON, e.g. to select a routing configuration or security profile (secret) |
+| `TSF_SIZER_GATEWAY_CHAT_PATH` | `/chat/completions` | Path added to the URL |
+| `TSF_SIZER_GATEWAY_CA_BUNDLE`, `_VERIFY_TLS` | system store, `true` | Private certificates; `false` is a last resort |
+| `TSF_SIZER_GATEWAY_TIMEOUT_S`, `_MAX_RETRIES` | `120`, `2` | Per request timeout; retries on timeouts, 429 and 5xx |
+| `TSF_SIZER_GATEWAY_TOOL_MODE` | `auto` | `native` tool calls, `json` (tool calls as JSON text), or `auto` (try native, fall back once) |
+| `TSF_SIZER_AGENT_MAX_STEPS` | `40` | Tool calls per run |
 
-**Ollama already installed on your machine:**
+The **Settings** page lists these variables (secrets only as set or not set), has a **Test connection** button (a plain request and a request with a tool) and the playbook editor. If the gateway's security profile blocks a request, the agent stops and says so: it does not retry or rephrase. A 401 or 403 names the variables to check; 429 and transient errors are retried.
 
-```bash
-ollama pull llama3.1:8b          # or qwen2.5:14b, mistral-nemo, …
-docker compose up -d
-```
-
-On **AI settings**: choose *Ollama*, leave the URL empty, click **Find models**, pick one, **Save & test**. On Linux, Ollama listens on 127.0.0.1 only by default; let containers reach it with `OLLAMA_HOST=0.0.0.0` (systemd: `systemctl edit ollama`).
-
-**Ollama in Docker next to the app:**
-
-```bash
-docker compose --profile ollama up -d
-docker compose exec ollama ollama pull llama3.1:8b
-```
-
-and use server URL `http://ollama:11434`. Without a GPU, an 8B model needs about 8 GB RAM and a minute or so per summary; raise the timeout under *Advanced* for bigger models.
-
-Or set it up front in `.env`:
-
-```bash
-TSF_SIZER_LLM_PROVIDER=ollama
-TSF_SIZER_LLM_MODEL=llama3.1:8b
-# TSF_SIZER_LLM_BASE_URL=http://ollama:11434
-# TSF_SIZER_LLM_API_KEY=...   (OpenAI-compatible servers that need one, Anthropic)
-```
-
-What is sent and checked:
-
-- Only the computed figures go to the LLM: models, counts, capacities, assumptions and warnings. Never the TSF, hostnames, IP addresses, serial numbers or object names. *AI settings* shows the exact data for the latest analysis and the instructions given to the model.
-- Every number and model name in the answer is checked against that data; anything else is flagged in the report. **Rewrite** regenerates the summary with the current settings.
-- API keys are only read from `TSF_SIZER_LLM_API_KEY`, never stored or shown.
-- An unreachable or failing LLM never fails the analysis; the report shows the error and a *Try again* button. Untick *Write an AI summary* on the upload form to skip it for one analysis.
-
-### Refining a recommendation with the assistant
-
-With an LLM configured, every finished report has a **Refine with the assistant** card. Type what is different for this customer and the assistant adjusts the sizing rules; the engine recomputes the recommendation, and every change is listed in the conversation and can be undone.
-
-- *"The customer no longer needs the optics"*: SFP/SFP+/QSFP ports are dropped from the port requirement (copper only).
-- *"He now needs two 10G fibre ports"* (or *"he now needs optics"*, which makes it ask how many and which speed): those ports are required on top of today's layout.
-- *"Expect 40% growth over 5 years"*, *"known peak is 800 Mbps"*, *"needs PoE"*, *"include the PA-400"*: the sizing assumptions.
-- *"Ignore the aggregate interface limit"*: a limit that may fall short without excluding a model; the shortfall is flagged as *not blocking* on every model it applies to.
-- *"The customer's box is way oversized, I need a PA-3500 that covers the current usage"*: sizes by usage instead of requiring the current model's limits and more performance (the default rule is for upgrades and like-for-like moves), and considers only the PA-3500 series.
-- *"No 5G models"*, *"leave out the PA-3400 series"*: exclusions.
-- *"Why was the PA-560 not chosen?"*: explains from the engine's reasons, changes nothing.
-
-How it works: the LLM only translates your message into a small set of validated actions (`backend/tsf_sizer/sizing/adjust.py`); it never picks firewalls or calculates. Unknown models, limits or port types and out-of-range numbers are refused and reported. The explanation it writes afterwards is checked against the engine's numbers like the written summary. Only aggregated figures and your own messages are sent to the LLM. If the model is unreachable nothing changes. Models of 8B parameters and up follow the action format reliably; very small ones may need rephrasing. The adjustments stay when you use **Change and re-run**; **Clear all** removes them.
+What is sent: aggregated facts and tool results (model, counts, capacity values, assumptions) and your messages. Never the TSF, host names, IP addresses, serial numbers, user names or object and rule names. Every message is also passed through a filter that masks addresses, host names, e-mail addresses and serial-like numbers. The uploaded TSF is deleted after parsing, so the agent cannot read raw text from it.
 
 ### Building behind a TLS-inspecting proxy
 
@@ -107,8 +91,9 @@ docker compose up -d
 
 ## What the report contains
 
-- **AI summary** (optional): a written justification by the LLM you configured, fact-checked against the sizing data.
-- **Recommendation**: the smallest quotable model that passes every rule, plus a *Better* (next step up) and *Best* (next family up) option, each with its closest limits.
+- **Verdict** (with an LLM): the agent's recommendation, alternatives, rejected models, open points and every limit of the recommended model, each figure verified against tool results. Earlier versions stay readable.
+- **Ledger**: every assumption behind the answer, who set it and why.
+- **Quick result**, the rule-based recommendation: the smallest quotable model that passes every rule, plus a *Better* (next step up) and *Best* (next family up) option, each with its closest limits.
 - **Check before quoting**: everything that makes the numbers less certain: short history after a reboot, snapshot-only throughput, expired licenses, unconfirmed capacity values, ports whose type had to be assumed.
 - **Current usage** and a **requirements table**: usage of the current model per capacity (with meters), the requirement after growth, and whether the recommended model covers it.
 - **Interfaces**: ports in use (traffic/HA) and how they map onto the recommended model.
@@ -117,7 +102,7 @@ docker compose up -d
 
 ### Sizing rules
 
-Defaults can be changed per analysis under *Sizing assumptions and known peaks*.
+These are the rules of the quick result (the agent's playbook has the same defaults). Change them per analysis in the **Ledger** tab or on the upload form.
 
 - Capacities must cover usage × growth (default 20 %/year over 3 years).
 - Throughput, connections/s and sessions are sized to stay under the target utilization (default 70 %), and must be **higher** than the current model's.
@@ -128,7 +113,7 @@ Defaults can be changed per analysis under *Sizing assumptions and known peaks*.
 - Unreleased (NPI) models and chassis cards are never recommended.
 - **Previous generations** (e.g. PA-400, succeeded by PA-500) are left out unless *Include previous-generation models* is ticked on the analysis form.
 - **PoE:** dedicated PoE models (e.g. PA-545-POE, PA-555-POE) are only recommended when *Customer needs PoE* is ticked; then only models with PoE ports qualify (which includes models with PoE as standard, like the PA-1400 series). It switches on automatically when the TSF shows PoE devices powered on the current firewall.
-- **No oversizing:** models with more than 5× the current model's throughput (or 5× the requirement, if that is higher) are listed as "too large" instead of recommended. Change the factor under *Sizing assumptions*.
+- **No oversizing:** models with more than 5× the current model's throughput (or 5× the requirement, if that is higher) are listed as "too large" instead of recommended. Change the factor in the Ledger.
 
 ### Family settings (Portfolio page)
 
@@ -154,7 +139,7 @@ The current workbook only covers current platforms. So that a TSF from an older 
 - Only the files needed are read from the TSF (CLI output, config XML); logs are skipped.
 - Uploaded files are deleted as soon as the analysis is done, also when it fails.
 - Results keep counts and metrics only, no hostnames, serial numbers, IP addresses, admin names or object names.
-- Nothing is sent outside the container, unless you configure a hosted LLM for the AI summary; even then only aggregated figures are sent (see above). With Ollama or another local server, nothing leaves your network.
+- Nothing is sent outside the container unless you configure an LLM; then only aggregated facts, tool results and your messages go to the AI gateway, filtered as described above.
 
 ## Development
 
@@ -164,6 +149,13 @@ See [backend/README.md](backend/README.md) for the command-line tools and tests,
 cd backend && pip install -e ".[dev]"
 uvicorn --factory tsf_sizer.web.app:create_app --reload --port 8088
 pytest && ruff check .
+```
+
+**Evaluating the agent** with the model behind your gateway: golden cases (the aggregated result of an analysis, the answers to give, what a good run looks like) are run end to end and scored on reaching a verdict, an acceptable model, verified figures, mentioned anomalies, the step budget and nothing identifying sent. Cases built from customer data go in the gitignored `backend/evals/private/`; one synthetic case is included.
+
+```bash
+cd backend && TSF_SIZER_LLM_MODE=gateway TSF_SIZER_GATEWAY_URL=... TSF_SIZER_GATEWAY_API_KEY=... \
+  TSF_SIZER_GATEWAY_MODEL=... python -m tsf_sizer.agent.evals --workbook /path/to/capacity.xlsx --cases evals/
 ```
 
 ## License
