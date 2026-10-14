@@ -312,3 +312,47 @@ def test_poe_in_use_becomes_a_metric(text):
     s = summarize(parse_techsupport(text + extra))
     assert s.metrics["state.poe_ports_in_use"].value == 1
     assert s.poe["ports_in_use"] == ["ethernet1/2"]
+
+
+def test_resource_monitor_state_does_not_leak_between_blocks():
+    """KeyError: 'packet_descriptor': a utilization label stayed active when the next CPU block
+    started, and a numeric line after a gap then looked it up in a period without it."""
+    from tsf_sizer.tsf.techsupport import parse_resource_monitor
+
+    body = """
+Resource utilization (%) during last 60 seconds:
+session:
+  1  2  3
+packet descriptor:
+  4  5  6
+
+CPU load (%) during last 60 minutes:
+core   0  1
+avg max avg max
+  1 2 3 4
+
+  7 8 9 10
+"""
+    rm = parse_resource_monitor(body)
+    assert rm["second"]["util"]["packet_descriptor"] == [4, 5, 6]
+    assert rm["minute"]["cpu"] == [[1, 2, 3, 4], [7, 8, 9, 10]]  # rows after the gap are kept
+    assert "packet_descriptor" not in rm["minute"]["util"]
+
+
+@pytest.mark.parametrize(
+    "section",
+    ["parse_session_info", "parse_resource_monitor", "parse_interface_all", "parse_ha",
+     "parse_poe", "parse_licenses", "parse_counters"],
+)  # fmt: skip
+def test_an_unreadable_section_is_a_warning_not_a_failure(monkeypatch, section):
+    from tsf_sizer.tsf import techsupport
+
+    def boom(*a, **k):
+        raise KeyError("packet_descriptor")
+
+    monkeypatch.setattr(techsupport, section, boom)
+    facts = techsupport.parse_techsupport(FIXTURE.read_text())
+    assert any("packet_descriptor" in e for e in facts.parse_errors)
+    summary = summarize(facts)  # the rest of the pipeline copes with the empty section
+    assert any(w.startswith("Could not read:") for w in summary.warnings)
+    assert summary.model == "PA-3430"

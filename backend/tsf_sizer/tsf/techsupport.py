@@ -180,12 +180,15 @@ def parse_resource_monitor(body: str) -> dict:
     i = 0
     period = None
     metric = None
+    in_cpu = False
     while i < len(lines):
         line = lines[i].strip()
         m = re.match(r"CPU load \(%\) during (last \d+ \w+):", line)
         if m:
             period = _RM_PERIODS.get(m.group(1))
             result.setdefault(period, {"cpu": [], "util": {}})
+            metric = None  # a utilization label from an earlier block must not leak into this one
+            in_cpu = True
             i += 1
             # skip header rows ("core 0 1 2", "avg max ...")
             while i < len(lines) and re.match(r"^\s*(core|avg)\b", lines[i]):
@@ -199,6 +202,7 @@ def parse_resource_monitor(body: str) -> dict:
             period = _RM_PERIODS.get(m.group(1))
             result.setdefault(period, {"cpu": [], "util": {}})
             metric = None
+            in_cpu = False
             i += 1
             continue
         m = re.match(r"^([a-z][a-z ]+?)(?: \((average|maximum)\))?:$", line)
@@ -206,10 +210,15 @@ def parse_resource_monitor(body: str) -> dict:
             name = m.group(1).strip().replace(" ", "_")
             metric = name + (f"_{m.group(2)[:3]}" if m.group(2) else "")
             result[period]["util"].setdefault(metric, [])
+            in_cpu = False
             i += 1
             continue
-        if metric and period and re.match(r"^\s*([*\d]+\s+)*[*\d]+\s*$", lines[i]):
-            result[period]["util"][metric].extend(_cell(t) for t in lines[i].split())
+        numeric = re.match(r"^\s*([*\d]+\s+)*[*\d]+\s*$", lines[i])
+        if in_cpu and period and numeric:
+            # more CPU rows after a gap (blank line, repeated header): still this block's
+            result[period]["cpu"].append([_cell(t) for t in lines[i].split()])
+        elif metric and period and numeric:
+            result[period]["util"].setdefault(metric, []).extend(_cell(t) for t in lines[i].split())
         i += 1
     return result
 
@@ -442,6 +451,7 @@ class TechSupportFacts:
     counters_of_interest: dict = field(default_factory=dict)
     poe: dict = field(default_factory=dict)
     missing_commands: list = field(default_factory=list)
+    parse_errors: list = field(default_factory=list)  # sections that could not be read
 
 
 POLICY_COMMANDS = {
@@ -468,26 +478,45 @@ def parse_techsupport(text: str) -> TechSupportFacts:
             f.missing_commands.append(cmd)
         return body
 
+    def guarded(label: str, fn, default):
+        """One unreadable section must not fail the whole analysis: report it, carry on."""
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001 - firmware output varies; keep what can be read
+            f.parse_errors.append(f"{label} ({type(e).__name__}: {e})")
+            return default
+
     if b := need("show system info"):
         f.system = parse_system_info(b)
     if b := need("show session info"):
-        f.sessions = parse_session_info(b)
+        f.sessions = guarded("session info", lambda: parse_session_info(b), {})
     if b := need("show running resource-monitor"):
-        rm = parse_resource_monitor(b)
-        f.resource_monitor = {"series": rm, "summary": summarize_resource_monitor(rm)}
+
+        def resource_monitor():
+            rm = parse_resource_monitor(b)
+            return {"series": rm, "summary": summarize_resource_monitor(rm)}
+
+        f.resource_monitor = guarded("resource monitor (CPU history)", resource_monitor, {})
     if b := need("show interface all"):
-        f.interfaces = parse_interface_all(b)
-        details = {}
-        for hw in f.interfaces["hardware"]:
-            if hw["name"].startswith(("ethernet", "ae")):
-                d = ts.get(f"show interface {hw['name']}")
-                if d:
-                    details[hw["name"]] = parse_interface_detail(d)
-        f.interfaces["details"] = details
-    f.ha = parse_ha(ts.get("show high-availability all") or "")
-    f.poe = parse_poe(ts.get("show poe detail"))
+
+        def interfaces():
+            out = parse_interface_all(b)
+            details = {}
+            for hw in out["hardware"]:
+                if hw["name"].startswith(("ethernet", "ae")):
+                    d = ts.get(f"show interface {hw['name']}")
+                    if d:
+                        details[hw["name"]] = parse_interface_detail(d)
+            out["details"] = details
+            return out
+
+        f.interfaces = guarded("interfaces", interfaces, {})
+    f.ha = guarded(
+        "high availability", lambda: parse_ha(ts.get("show high-availability all") or ""), {}
+    )
+    f.poe = guarded("PoE", lambda: parse_poe(ts.get("show poe detail")), {})
     if b := need("request license info"):
-        f.licenses = parse_licenses(b)
+        f.licenses = guarded("licenses", lambda: parse_licenses(b), [])
 
     for key, cmd in POLICY_COMMANDS.items():
         f.policies[key] = count_rules(ts.get(cmd))
@@ -510,6 +539,10 @@ def parse_techsupport(text: str) -> TechSupportFacts:
         ),
     }
     if b := ts.get("show counter global"):
-        counters = parse_counters(b)
-        f.counters_of_interest = {k: v for k, v in counters.items() if _PRESSURE.search(k)}
+
+        def counters_of_interest():
+            counters = parse_counters(b)
+            return {k: v for k, v in counters.items() if _PRESSURE.search(k)}
+
+        f.counters_of_interest = guarded("global counters", counters_of_interest, {})
     return f

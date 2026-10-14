@@ -464,6 +464,11 @@ def _warnings(f: TechSupportFacts, s: TsfSummary, uptime_s: int | None) -> list[
         )
     if f.missing_commands:
         w.append("Missing from techsupport file: " + ", ".join(f.missing_commands))
+    if f.parse_errors:
+        w.append(
+            "Could not read: " + "; ".join(f.parse_errors) + ". Values from these parts of the "
+            "TSF are missing; please send this TSF so the parser can be fixed."
+        )
     src = s.config_source or ""
     if not src:
         w.append(
