@@ -484,13 +484,20 @@ details.more > summary::-webkit-details-marker { display: none; }
   .chip-glass { color: #000; border-color: #ccc; background: #f4f6fa; }
   details[data-print-open] > summary { display: none; }
   details.more:not([data-print-open]) { display: none; }
-  .table { font-size: 8.5pt; }
-  .table th, .table td { padding: 4px 6px; }
-  .table thead th { position: static; }
+  /* Tables must show every column and row on paper: no scroll box, wrap long labels, repeat the
+     header on each page, and let long sections break across pages. */
+  .table-wrap { overflow: visible; }
+  .table { font-size: 8.5pt; table-layout: auto; width: 100%; }
+  .table th, .table td { padding: 4px 6px; overflow-wrap: anywhere; }
+  .table thead { display: table-header-group; }
+  .table thead th { position: static; white-space: normal; }
+  .table .nowrap { white-space: normal; }
   .meter { min-width: 0; }
   .meter-track { min-width: 40px; }
   .reveal, .meter-fill, .spec-bar i { animation: none !important; }
-  section, .card, .rec, .kpi, tr { break-inside: avoid; }
+  .card, .rec, .kpi, tr { break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+  @page { margin: 12mm; }
   a { color: inherit; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
