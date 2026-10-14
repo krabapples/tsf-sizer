@@ -488,12 +488,12 @@ details.more > summary::-webkit-details-marker { display: none; }
      header on each page, and let long sections break across pages. */
   .table-wrap { overflow: visible; }
   .table { font-size: 8.5pt; table-layout: auto; width: 100%; }
-  .table th, .table td { padding: 4px 6px; overflow-wrap: anywhere; }
+  .table th, .table td { padding: 4px 5px; overflow-wrap: break-word; word-break: normal; }
   .table thead { display: table-header-group; }
-  .table thead th { position: static; white-space: normal; }
+  .table thead th { position: static; white-space: normal; font-size: 6.5pt; letter-spacing: 0; }
   .table .nowrap { white-space: normal; }
   .meter { min-width: 0; }
-  .meter-track { min-width: 40px; }
+  .meter-track { display: none; }  /* the percentage stays; the bar costs a column of width */
   .reveal, .meter-fill, .spec-bar i { animation: none !important; }
   .card, .rec, .kpi, tr { break-inside: avoid; }
   h2, h3 { break-after: avoid; }
