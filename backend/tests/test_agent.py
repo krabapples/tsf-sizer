@@ -206,3 +206,27 @@ def test_closest_blocked_lists_smaller_models_missing_one_or_two_rules():
     got = agent.closest_blocked(sizing)
     assert [g["model"] for g in got] == ["PA-550", "PA-520"]
     assert agent.closest_blocked({"recommended": None, "rejected": []}) == []
+
+
+def test_right_size_and_only_survive_rerun_and_clear(chat_app):
+    c, app = chat_app
+    conn = db.connect(app.state.settings.db_path)
+    row = conn.execute("SELECT params_json FROM analysis WHERE id=1").fetchone()
+    params = json.loads(row[0]) | {"right_size": True, "only_models": ["PA-3400"]}
+    with conn:
+        conn.execute("UPDATE analysis SET params_json=? WHERE id=1", (json.dumps(params),))
+    conn.close()
+    form = {"growth_pct": "30", "years": "3", "target_util_pct": "70", "max_size_factor": "0"}
+    assert c.post("/analyses/1/rerun", data=form, follow_redirects=False).status_code == 303
+    import time
+
+    for _ in range(100):
+        if c.get("/api/analyses/1").json()["status"] == "done":
+            break
+        time.sleep(0.05)
+    p = report(c)["sizing"]["params"]
+    assert p["right_size"] is True and p["only_models"] == ["PA-3400"]
+    assert p["growth_pct_per_year"] == 30
+    assert c.post("/analyses/1/adjustments/clear", follow_redirects=False).status_code == 303
+    p = report(c)["sizing"]["params"]
+    assert p["right_size"] is False and p["only_models"] == []

@@ -12,6 +12,7 @@ Actions (dicts):
   {"action": "enforce", "metric": key}     # undo "ignore"
   {"action": "exclude", "models": [model | family | "variant:5G"]}
   {"action": "include", "models": [...]}   # undo "exclude"
+  {"action": "only", "models": [...]}      # consider only these models/families ([] = all)
   {"action": "reset"}                      # clear all port/ignore/exclude adjustments
   {"action": "explain", "model": name}     # read-only: why a model was or was not chosen
 """
@@ -34,7 +35,11 @@ NUMBER_PARAMS = {
     "max_size_factor": ("max_size_factor", 0, 100, False),
 }
 NULLABLE = {"peak_throughput_mbps", "peak_cps", "peak_sessions"}  # null clears a known peak
-BOOL_PARAMS = {"need_poe": "need_poe", "include_superseded": "include_superseded"}
+BOOL_PARAMS = {
+    "need_poe": "need_poe",
+    "include_superseded": "include_superseded",
+    "right_size": "right_size",
+}
 PORT_CLASSES = sorted(PORT_COMPAT)
 VARIANT_TAGS = {"5G", "RUGGED", "POE"}
 MAX_PORTS = 64
@@ -118,6 +123,7 @@ def apply_actions(
         port_add=dict(params.port_add),
         soft_metrics=list(params.soft_metrics),
         exclude_models=list(params.exclude_models),
+        only_models=list(params.only_models),
     )
     out = Applied(p)
 
@@ -227,11 +233,26 @@ def apply_actions(
                     if kind == "include" and canon in p.exclude_models:
                         p.exclude_models.remove(canon)
                         note(f"{shown} allowed again")
+            elif kind == "only":
+                names = []
+                for raw in a.get("models") or []:
+                    s = str(raw).strip().upper()
+                    if s not in models:
+                        raise ValueError(f"unknown model or family '{raw}'")
+                    names.append(s)
+                if names != p.only_models:
+                    p.only_models = names
+                    note(
+                        "only " + ", ".join(models[n] for n in names) + " considered"
+                        if names
+                        else "all models considered again"
+                    )
             elif kind == "reset":
                 if p.adjusted:
                     note("all adjustments cleared")
                 p.port_drop, p.port_add = [], {}
                 p.soft_metrics, p.exclude_models = [], []
+                p.right_size, p.only_models = False, []
             elif kind == "explain":
                 m = str(a.get("model", "")).strip().upper()
                 if m not in models:
@@ -247,6 +268,10 @@ def apply_actions(
 def describe(params: SizingParams, metrics: dict[str, str]) -> list[str]:
     """The adjustments in effect, for display."""
     d = []
+    if params.right_size:
+        d.append("sized by usage (not by the current model's limits)")
+    if params.only_models:
+        d.append("only " + ", ".join(params.only_models))
     for c in params.port_drop:
         d.append("no optics needed" if c == "optics" else f"no {c} ports needed")
     for c, n in params.port_add.items():

@@ -90,6 +90,7 @@ With an LLM configured, every finished report has a **Refine with the assistant*
 - *"He now needs two 10G fibre ports"* (or *"he now needs optics"*, which makes it ask how many and which speed): those ports are required on top of today's layout.
 - *"Expect 40% growth over 5 years"*, *"known peak is 800 Mbps"*, *"needs PoE"*, *"include the PA-400"*: the sizing assumptions.
 - *"Ignore the aggregate interface limit"*: a limit that may fall short without excluding a model; the shortfall is flagged as *not blocking* on every model it applies to.
+- *"The customer's box is way oversized, I need a PA-3500 that covers the current usage"*: sizes by usage instead of requiring the current model's limits and more performance (the default rule is for upgrades and like-for-like moves), and considers only the PA-3500 series.
 - *"No 5G models"*, *"leave out the PA-3400 series"*: exclusions.
 - *"Why was the PA-560 not chosen?"*: explains from the engine's reasons, changes nothing.
 

@@ -334,6 +334,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         old = stored_params(row)  # the form has no fields for the assistant's adjustments
         params.port_drop, params.port_add = old.port_drop, old.port_add
         params.soft_metrics, params.exclude_models = old.soft_metrics, old.exclude_models
+        params.right_size, params.only_models = old.right_size, old.only_models
         with conn() as c:
             c.execute("UPDATE analysis SET status='running', error=NULL WHERE id=?", (analysis_id,))
         app.state.executor.submit(
@@ -596,6 +597,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         params = stored_params(row)
         params.port_drop, params.port_add = [], {}
         params.soft_metrics, params.exclude_models = [], []
+        params.right_size, params.only_models = False, []
         restore(analysis_id, params, "Cleared all adjustments.")
         return RedirectResponse(f"/analyses/{analysis_id}#assistant", status_code=303)
 

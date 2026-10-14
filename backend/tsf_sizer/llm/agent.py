@@ -49,6 +49,8 @@ Actions (use only these):
       (10-100), peak_throughput_mbps, peak_cps, peak_sessions (a number, or null to clear),
       max_size_factor (above 1, or 0 for no limit), need_poe (true/false),
       include_superseded (true/false: previous generations such as the PA-400),
+      right_size (true/false: size by usage only, instead of requiring at least the current
+      model's limits and more performance; for a customer whose box is oversized),
       port_rule ("all" = same port layout as today, "used" = only the ports in use)
   {{"action": "ports", "drop": [...], "keep": [...], "add": {{"CLASS": count}}, "reset": false}}
       "drop": port types no longer needed; "optics" means every SFP/SFP+/SFP28/QSFP port.
@@ -59,7 +61,10 @@ Actions (use only these):
   {{"action": "exclude", "models": [...]}}  model names, families (e.g. "PA-3400") or
       "variant:5G" / "variant:rugged" / "variant:PoE"
   {{"action": "include", "models": [...]}}  undoes "exclude"
-  {{"action": "reset"}}                     clears all port / ignore / exclude adjustments
+  {{"action": "only", "models": [...]}}     consider only these models or families, e.g.
+      ["PA-3500"]; an empty list considers everything again
+  {{"action": "reset"}}                     clears all adjustments (ports, ignore, exclude, only,
+      right_size)
   {{"action": "explain", "model": NAME}}    the engineer asks why a model was or was not chosen
 
 Rules:
@@ -67,6 +72,8 @@ Rules:
   "needs optics / fibre / SFP now": ports add. If the number of ports or the speed is not
   given, ask a question instead ("How many ports, and which speed: 1G SFP, 10G SFP+ ...?").
   Typical fibre uplinks are 10G_SFP+.
+- "the box is oversized / a smaller box / downsize / right-size" -> set right_size true.
+  "a model in the PA-3500 series" -> only ["PA-3500"]. Both often come together.
 - "needs PoE" -> set need_poe true. "no 5G models" -> exclude ["variant:5G"].
 - Several things in one message -> several actions.
 - A question about a model ("why not the PA-560?") -> explain. Use no other action for it.
@@ -81,6 +88,9 @@ Examples:
     {{"action": "set", "name": "growth_pct", "value": 40}}], "question": null}}
 "Now he needs optics"
   {{"actions": [], "question": "How many optical ports, and which speed (1G SFP, 10G SFP+)?"}}
+"The customer box is way oversized, I need a PA-3500 that covers the current usage"
+  {{"actions": [{{"action": "set", "name": "right_size", "value": true}},
+    {{"action": "only", "models": ["PA-3500"]}}], "question": null}}
 "Ignore the aggregate interface limit, they do not use LACP"
   {{"actions": [{{"action": "ignore", "metric": "config.aggregate_interfaces"}}], "question": null}}
 """

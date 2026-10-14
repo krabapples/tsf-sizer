@@ -132,6 +132,11 @@ class SizingParams:
     #   soft_metrics:    metric keys (see Requirement.metric / "feature.*") that may fall short
     #                    without excluding a model; the shortfall is flagged instead
     #   exclude_models:  model or family names that must not be offered
+    #   right_size:      size by usage (x growth) only: a model need not match or beat the
+    #                    current model's limits. For a customer whose box is oversized.
+    #   only_models:     consider only these models or families (e.g. ["PA-3500"])
+    right_size: bool = False
+    only_models: list[str] = field(default_factory=list)
     port_drop: list[str] = field(default_factory=list)
     port_add: dict[str, int] = field(default_factory=dict)
     soft_metrics: list[str] = field(default_factory=list)
@@ -139,7 +144,14 @@ class SizingParams:
 
     @property
     def adjusted(self) -> bool:
-        return bool(self.port_drop or self.port_add or self.soft_metrics or self.exclude_models)
+        return bool(
+            self.right_size
+            or self.only_models
+            or self.port_drop
+            or self.port_add
+            or self.soft_metrics
+            or self.exclude_models
+        )
 
     @property
     def growth_factor(self) -> float:
@@ -332,7 +344,7 @@ def build_requirements(
 # --------------------------------------------------------------------------- checks
 
 
-def _check(req: Requirement, cap: dict | None) -> Check:
+def _check(req: Requirement, cap: dict | None, baseline: bool = True) -> Check:
     label, required = req.label, req.required
     if cap is None or cap.get("kind") in (None, "empty"):
         return Check(
@@ -401,7 +413,7 @@ def _check(req: Requirement, cap: dict | None) -> Check:
     reasons = []
     if num < required:
         reasons.append(f"needs {_fmt(required)}, has {_fmt(num)}")
-    if req.current_capacity is not None and req.metric not in BASELINE_EXEMPT:
+    if baseline and req.current_capacity is not None and req.metric not in BASELINE_EXEMPT:
         if req.is_perf and num <= req.current_capacity:
             reasons.append(f"not more than current model ({_fmt(req.current_capacity)})")
         elif not req.is_perf and num < req.current_capacity:
@@ -589,6 +601,16 @@ def size(
     user_soft = frozenset(params.soft_metrics)
     soft_limits = family_soft | user_soft
     excluded = {x.upper() for x in params.exclude_models}
+    only = {x.upper() for x in params.only_models}
+    if params.right_size:
+        result.notes.append(
+            "Sized by usage: a replacement has to cover the measured usage plus growth, "
+            f"not match or beat the limits of the current {current or 'model'}."
+        )
+    if only:
+        result.notes.append(
+            "Only these were considered at your request: " + ", ".join(sorted(only)) + "."
+        )
     if user_soft:
         result.notes.append(
             "Not blocking at your request: " + ", ".join(sorted(user_soft)) + "; a shortfall is "
@@ -617,7 +639,14 @@ def size(
             or any(f"VARIANT:{v.upper()}" in excluded for v in variants(model["name"]))
         ):
             continue
-        if model["family"] in superseded and not params.include_superseded:
+        if (
+            only
+            and model["name"].upper() not in only
+            and (model["family"] or "").upper() not in only
+        ):
+            continue
+        asked_for = (model["family"] or "").upper() in only or model["name"].upper() in only
+        if model["family"] in superseded and not params.include_superseded and not asked_for:
             result.excluded_families[model["family"]] = superseded[model["family"]]
             continue
         caps = catalog.mapped_capacities(conn, model["name"], document_id)
@@ -625,7 +654,7 @@ def size(
             continue
         cand = Candidate(model["name"], model["family"], True)
         for req in reqs:
-            chk = _check(req, caps.get(req.metric))
+            chk = _check(req, caps.get(req.metric), baseline=not params.right_size)
             if chk.status == "fail" and req.metric in soft_limits:
                 chk.status = "warn"
                 if req.metric in family_soft:

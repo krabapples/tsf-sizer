@@ -145,3 +145,39 @@ def test_engine_user_soft_metric_flags_instead_of_excluding(sized_db):
     cand = _everyone(soft)["PA-3430"]
     assert not any("aggregate" in f.lower() for f in cand.failures)
     assert any("Not blocking at your request" in n for n in cand.notices)
+
+
+def test_right_size_and_only_actions():
+    r = run({"action": "set", "name": "right_size", "value": True},
+            {"action": "only", "models": ["pa-3400", "PA-3430"]})  # fmt: skip
+    assert r.params.right_size is True and r.params.only_models == ["PA-3400", "PA-3430"]
+    assert "sized by usage" in " ".join(describe(r.params, METRICS))
+    assert run({"action": "only", "models": ["PA-9999"]}).errors
+    back = run({"action": "only", "models": []}, params=r.params)
+    assert back.params.only_models == [] and back.changes == ["all models considered again"]
+    assert not run({"action": "reset"}, params=r.params).params.adjusted
+
+
+def test_engine_right_size_drops_the_current_model_baseline(sized_db):
+    s = summary_as("PA-3430")  # a downsizing case: everything else is smaller
+    kw = dict(include_superseded=True, max_size_factor=0, port_rule="used")
+    strict = size(sized_db, s, SizingParams(**kw))
+    rejected = {c.model: c.failures for c in strict.rejected}
+    assert any("current model" in f for f in rejected["PA-540"])
+    loose = size(sized_db, s, SizingParams(**kw, right_size=True))
+    assert any(n.startswith("Sized by usage") for n in loose.notes)
+    for c in loose.rejected:  # only what the usage itself needs can reject a model now
+        assert not any("current model" in f for f in c.failures)
+    assert any("needs 5.925" in f for f in {c.model: c.failures for c in loose.rejected}["PA-540"])
+
+
+def test_engine_only_models_and_families(sized_db):
+    s = summary_as("PA-450R")
+    kw = dict(include_superseded=True, max_size_factor=0, right_size=True)
+    seen = set(_everyone(size(sized_db, s, SizingParams(**kw, only_models=["PA-3400"]))))
+    assert seen and seen <= {"PA-3430"}
+    # by model name too, and a superseded family is considered when it is asked for by name
+    named = set(_everyone(size(sized_db, s, SizingParams(**kw, only_models=["pa-540"]))))
+    assert named == {"PA-540"}
+    off = SizingParams(max_size_factor=0, right_size=True, only_models=["PA-400"])
+    assert set(_everyone(size(sized_db, s, off))) <= {"PA-410", "PA-450R-5G", "PA-455R-5G"}
