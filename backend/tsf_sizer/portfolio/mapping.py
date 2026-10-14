@@ -156,7 +156,6 @@ TSF_METRIC_MAP: list[tuple[str, str, str, str]] = [
     ("feature.gtp", "Mobile Protocols", "GTP", "feature"),
     ("feature.sctp", "Mobile Protocols", "SCTP", "feature"),
     ("feature.hsm", "SSL Decryption", "HSM Supported", "feature"),
-    ("feature.lre_routing", "Routing", "Legacy Routing Engine (LRE) Support", "feature"),
 ]
 
 # "Traffic - <label>" rows in the Interfaces category -> port speed class.

@@ -212,12 +212,12 @@ code { font-family: var(--mono); font-size: .85em; background: var(--surface-3);
 .field > label, .label { font-weight: 650; font-size: .86rem; color: var(--ink-2); }
 .opt { font-weight: 500; font-size: .72rem; color: var(--muted); margin-left: 4px; }
 .hint { font-size: .78rem; color: var(--muted); line-height: 1.45; }
-.input, input[type="text"], input[type="number"], select {
+.input, textarea.input, .field textarea, input[type="text"], input[type="number"], select {
   font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: 12px; padding: 10px 12px; min-height: 44px; width: 100%;
   transition: border-color .15s, box-shadow .15s;
 }
-input[type="text"]:focus, input[type="number"]:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+input[type="text"]:focus, .field textarea:focus, input[type="number"]:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
 .input-suffix { position: relative; }
 .input-suffix input { padding-right: 52px; }
 .input-suffix span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .82rem; pointer-events: none; }
@@ -534,6 +534,8 @@ details.more > summary::-webkit-details-marker { display: none; }
 .chat-form textarea { flex: 1; resize: vertical; min-height: 52px; font: inherit; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); color: var(--ink); }
 .examples { display: flex; flex-wrap: wrap; gap: 6px 8px; }
 .examples .example { border: 0; cursor: pointer; font: inherit; }
+.segmented-wide { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.sizing-box { padding: 4px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .step-line { display: flex; gap: 8px; align-items: center; padding: 4px 10px; font-size: .84rem; color: var(--muted); border-left: 2px solid var(--border); margin-left: 6px; }
 .step-line .icon-sm { color: var(--good); flex: none; }
 .step-line.step-err .icon-sm { color: var(--crit); }

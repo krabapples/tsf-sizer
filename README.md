@@ -15,7 +15,7 @@ Open <http://localhost:8088>.
 
 **First time only:** go to **Portfolio**, import your capacity workbook (.xlsx), check the import report, and click **Activate**. The workbook is not part of the repo or the image; it lives in the container's data volume.
 
-Then, on **Analyses**, upload a TSF (the `.tgz` as exported, up to 1 GB). The report is ready a few seconds after the upload finishes. Use **Print / PDF** in the report for a document to share.
+Then, on **Analyses**, first answer the questions about the customer (like for like or a smaller box, optics, extra ports, notes, models to include or leave out; they shape the first result and the agent does not ask them again), then upload a TSF (the `.tgz` as exported, up to 1 GB). The report is ready a few seconds after the upload finishes. Use **Print / PDF** in the report for a document to share.
 
 Stop with `docker compose down`. Analyses and the portfolio survive restarts (Docker volume `tsf-sizer-data`); `docker compose down -v` deletes them.
 

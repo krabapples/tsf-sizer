@@ -12,7 +12,7 @@ Rules (the team's sizing policy):
     are not recommended
 
 Soft rules never exclude a model but are flagged on it (Candidate.notices, and in the notes
-of the recommended model): see SOFT_FEATURES and SOFT_LIMITS.
+of the recommended model): see SOFT_LIMITS and the ignore/soft_metrics setting.
 """
 
 from __future__ import annotations
@@ -28,14 +28,9 @@ from ..tsf.metrics import TsfSummary
 
 PERF_METRICS = ("perf.throughput", "perf.cps", "perf.sessions")
 
-# Features the current firewall uses that a newer model may drop on purpose. Not supported is
-# a notice, never a reason to leave the model out.
-SOFT_FEATURES = {
-    "feature.lre_routing": (
-        "The Legacy Routing Engine (LRE) in use today is not supported on {model}: plan the "
-        "move to the Advanced Routing Engine"
-    ),
-}
+# Features that are never compared: the Legacy Routing Engine is not relevant to the sizing.
+# (Older stored analyses and workbook imports may still carry it.)
+IGNORED_FEATURES = frozenset({"feature.lre_routing"})
 
 # Limits that never block when replacing a model of the given family (they are still shown
 # when the candidate would have failed them): family of the current model -> metrics.
@@ -555,7 +550,7 @@ def size(
     features = {
         k: v.value
         for k, v in summary.metrics.items()
-        if k.startswith("feature.") and v.value is True
+        if k.startswith("feature.") and v.value is True and k not in IGNORED_FEATURES
     }
     poe_ports_used = (summary.poe or {}).get("ports_in_use", [])
     need_poe = params.need_poe or bool(poe_ports_used)
@@ -680,9 +675,7 @@ def size(
                 cand.unknown_features.append(fkey.removeprefix("feature.").replace("_", " "))
                 continue
             if not (cap.get("bool_value") == 1 or (cap.get("num_value") or 0) > 0):
-                if fkey in SOFT_FEATURES:
-                    cand.notices.append(SOFT_FEATURES[fkey].format(model=model["name"]))
-                elif fkey in user_soft:
+                if fkey in user_soft:
                     cand.notices.append(
                         f"{cap['name']}: not supported on {model['name']}. Not blocking at "
                         "your request; check it with the customer"

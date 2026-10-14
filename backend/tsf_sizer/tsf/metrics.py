@@ -367,13 +367,6 @@ def summarize(
             SNAPSHOT,
             "show poe detail",
         )
-    _m(
-        m,
-        "feature.lre_routing",
-        sysinfo.get("advanced-routing") == "off",
-        COUNT,
-        "show system info",
-    )
 
     # ---- ports
     s.ports = _ports(f)

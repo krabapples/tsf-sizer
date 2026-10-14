@@ -2,6 +2,7 @@
 {% from "_icons.html" import icon %}
 {% for m in messages %}
   {%- if m.role == 'user' and m.kind == 'start' -%}
+    {%- if m.data.notes -%}<div class="bubble bubble-user" data-id="{{ m.id }}"><p>{{ m.data.notes }}</p></div>{%- endif -%}
   {%- elif m.role == 'user' -%}
 <div class="bubble bubble-user" data-id="{{ m.id }}"><p>{{ m.content }}</p></div>
   {%- elif m.role == 'assistant' and m.kind == 'question' -%}

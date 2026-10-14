@@ -279,3 +279,61 @@ def test_restart_marks_a_working_run_as_interrupted(tmp_path, monkeypatch):
     conn = db.connect(app.state.settings.db_path)
     row = conn.execute("SELECT status, outcome FROM agent_run").fetchone()
     assert (row["status"], row["outcome"]) == ("error", "Interrupted by a restart")
+
+
+def test_sizing_input_before_the_analysis_reaches_the_ledger_and_the_agent(client, llm_env):
+    llm_env.script = [text_reply("Understood.")]
+    aid = new_analysis(
+        client,
+        goal="usage_only",
+        optics="none",
+        port_add_text="10g sfp+=2",
+        exclude_models_text="variant:5G",
+        notes="Branch office, 200 users. Budget is tight.",
+    )
+    wait_run(client, aid)
+    params = client.get(f"/analyses/{aid}/report.json").json()["sizing"]["params"]
+    assert params["right_size"] is True and params["port_drop"] == ["optics"]
+    assert params["port_add"] == {"10G_SFP+": 2} and params["exclude_models"] == ["VARIANT:5G"]
+    page = client.get(f"/analyses/{aid}").text
+    assert "Branch office, 200 users. Budget is tight." in page  # shown as the engineer's message
+    assert "usage_only" in page and '<span class="chip chip-primary">form</span>' in page
+    first = llm_env.requests[0]["body"]["messages"]
+    assert (
+        "Budget is tight" in first[1]["content"]
+        and "do not ask for it again" in first[1]["content"]
+    )
+    system = first[0]["content"]
+    assert "Already given by the engineer" in system and '"fit_mode": "usage_only"' in system
+
+
+def test_upload_form_asks_for_sizing_input_first(client):
+    page = client.get("/").text
+    assert page.index("Step 1") < page.index("Step 2")
+    for name in (
+        "goal",
+        "optics",
+        "port_add_text",
+        "notes",
+        "only_models_text",
+        "exclude_models_text",
+    ):
+        assert f'name="{name}"' in page
+    assert "A smaller or cheaper box" in page
+
+
+def test_bad_sizing_input_is_refused(client, tmp_path):
+    for form in (
+        {"port_add_text": "10G_SFP+"},
+        {"port_add_text": "warp=2"},
+        {"exclude_models_text": "PA-1234"},
+        {"notes": "x" * 1001},
+    ):
+        assert upload(client, **form).status_code == 400, form
+    assert list((tmp_path / "uploads").iterdir()) == []
+
+
+def test_without_input_the_defaults_apply(client):
+    aid = new_analysis(client)
+    params = client.get(f"/analyses/{aid}/report.json").json()["sizing"]["params"]
+    assert params["right_size"] is False and params["port_drop"] == [] and params["port_add"] == {}

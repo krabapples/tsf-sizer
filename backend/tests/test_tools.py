@@ -261,3 +261,17 @@ def test_summaries_for_step_cards(box):
     assert tools.summarize("check_fit", {}, None, "boom") == "check_fit: boom"
     e = box.call("get_evidence", {"topic": "usage"})
     assert tools.summarize("get_evidence", e["args"], e["payload"]) == "Read the evidence: usage"
+
+
+def test_lre_is_ignored_by_the_tools(box):
+    row = box.conn.execute("SELECT result_json FROM analysis WHERE id=1").fetchone()
+    result = json.loads(row["result_json"])
+    result["summary"]["metrics"]["feature.lre_routing"] = {
+        "value": True, "kind": "count", "source": "old analysis", "unit": None, "note": None,
+    }  # fmt: skip
+    box.conn.execute("UPDATE analysis SET result_json=? WHERE id=1", (json.dumps(result),))
+    fresh = Toolbox(box.conn, 1)
+    ev = ok(fresh.call("get_evidence", {"topic": "usage"}))
+    assert "lre_routing" not in ev["features_in_use"]
+    fit = ok(fresh.call("check_fit", {"model": "PA-5550", "port_needs": {}}))
+    assert fit["meets_all"] and not any("Routing" in x for x in fit["failures"] + fit["notices"])

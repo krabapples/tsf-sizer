@@ -227,7 +227,7 @@
       Every capacity ≥ usage × growth ({{ v.params.growth_pct_per_year|num }}%/year over {{ v.params.years }} years = ×{{ v.params.growth_factor|num(2) }});
       performance sized to stay under {{ v.params.target_util_pct|num }}% and higher than the current model;
       object, rule and interface counts at least the current model's (per-item limits such as members per address group only need to cover usage);
-      ports: {{ v.port_rule }}; features in use supported (except the Legacy Routing Engine, which only gets a warning);
+      ports: {{ v.port_rule }}; features in use supported;
       {% if v.need_poe %}PoE needed: only models with PoE ports;{% else %}PoE not needed: dedicated PoE models left out;{% endif %}
       {% if v.size_cap %}at most {{ v.params.max_size_factor|num }}× the current performance ({{ v.size_cap|num }} Gbps);{% endif %}
       {% if v.excluded_families %}previous generations left out ({% for fam, succ in v.excluded_families.items() %}{{ fam }} → {{ succ }}{% if not loop.last %}, {% endif %}{% endfor %});{% elif v.params.include_superseded %}previous generations included;{% endif %}

@@ -26,12 +26,18 @@ Rules
 """
 
 
-def build(playbook: str, ledger_values: dict, current_model: str | None) -> str:
-    return (
+def build(playbook: str, effective: dict, current_model: str | None) -> str:
+    """`effective`: the ledger as ledger.effective() returns it (value, source, reason)."""
+    values = {k: e["value"] for k, e in effective.items()}
+    given = {k: e["value"] for k, e in effective.items() if e["source"] in ("form", "user")}
+    text = (
         SYSTEM
         + f"\nCurrent firewall: {current_model or 'unknown'}.\n"
         + "\nAssumptions ledger now (tools use these unless you override):\n"
-        + json.dumps(ledger_values, indent=1, default=str)
-        + "\n\nPLAYBOOK (team policy)\n"
-        + playbook
+        + json.dumps(values, indent=1, default=str)
     )
+    if given:
+        text += "\n\nAlready given by the engineer (do not ask for these again):\n" + json.dumps(
+            given, indent=1, default=str
+        )
+    return text + "\n\nPLAYBOOK (team policy)\n" + playbook

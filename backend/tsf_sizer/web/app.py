@@ -193,6 +193,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         include_superseded: str,
         need_poe: str,
         max_size_factor: float,
+        goal: str = "match_or_beat",
+        optics: str = "keep",
+        port_add_text: str = "",
+        only_models_text: str = "",
+        exclude_models_text: str = "",
     ) -> SizingParams:
         def opt(v: str) -> float | None:
             v = v.strip().replace(",", "")
@@ -210,6 +215,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(400, "Growth 0-200%, years 1-10, target utilization 10-100%")
         if not (max_size_factor == 0 or 1 < max_size_factor <= 100):
             raise HTTPException(400, "Maximum size must be above 1x (or 0 for no limit)")
+        try:
+            with conn() as c:
+                port_add = ledger.coerce(
+                    "port_add", agent_view.parse_value("port_add", port_add_text), c
+                )
+                only = ledger.coerce(
+                    "only_models", agent_view.parse_value("only_models", only_models_text), c
+                )
+                exclude = ledger.coerce(
+                    "exclude_models",
+                    agent_view.parse_value("exclude_models", exclude_models_text),
+                    c,
+                )
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
         return SizingParams(
             growth_pct_per_year=growth_pct,
             years=years,
@@ -221,6 +241,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             include_superseded=bool(include_superseded),
             need_poe=bool(need_poe),
             max_size_factor=max_size_factor,
+            right_size=goal == "usage_only",
+            port_drop=["optics"] if optics == "none" else [],
+            port_add=port_add,
+            only_models=only,
+            exclude_models=exclude,
         )
 
     @app.post("/analyses")
@@ -238,7 +263,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         include_superseded: str = Form(""),
         need_poe: str = Form(""),
         max_size_factor: float = Form(5.0),
+        goal: str = Form("match_or_beat"),
+        optics: str = Form("keep"),
+        port_add_text: str = Form(""),
+        only_models_text: str = Form(""),
+        exclude_models_text: str = Form(""),
+        notes: str = Form(""),
     ):
+        notes = notes.strip()
+        if len(notes) > 1000:
+            raise HTTPException(400, "The notes are limited to 1000 characters")
         params = build_params(
             growth_pct,
             years,
@@ -250,6 +284,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             include_superseded,
             need_poe,
             max_size_factor,
+            goal,
+            optics,
+            port_add_text,
+            only_models_text,
+            exclude_models_text,
         )
         tsf_path = await save_upload(tsf, ".tsf")
         config_path, config_name = None, None
@@ -273,11 +312,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             params,
             filename,
             config_name,
-            lambda aid: start_agent(aid),
+            lambda aid: start_agent(aid, notes=notes or None),
         )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
-    def start_agent(analysis_id: int, user_text: str | None = None) -> int | None:
+    def start_agent(
+        analysis_id: int, user_text: str | None = None, notes: str | None = None
+    ) -> int | None:
         """Start an agent run (the first one reads the evidence; later ones answer the
         engineer). None if the LLM is off or a run is already working."""
         if not llm_config.from_env().enabled:
@@ -285,7 +326,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with conn() as c:
             if runtime.active_run(c, analysis_id):
                 return None
-            run_id = runtime.start_run(c, analysis_id, user_text)
+            run_id = runtime.start_run(c, analysis_id, user_text, notes)
         app.state.agent_executor.submit(runtime.run_agent, settings.db_path, analysis_id, run_id)
         return run_id
 

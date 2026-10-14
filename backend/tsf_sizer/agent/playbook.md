@@ -50,8 +50,7 @@ for it, but say so and why, and record the deviation in the assumptions ledger.
 
 - PA-800 series: the maximum number of aggregate interfaces never blocks a replacement, but
   report it whenever it applies.
-- The Legacy Routing Engine (LRE) is not supported on newer models. That does not exclude a
-  model; tell the engineer to plan the move to the Advanced Routing Engine.
+- The Legacy Routing Engine is not relevant to the sizing. Do not mention it.
 - A limit with no value in the workbook is unverified. Never invent it. List it in the open points
   for the engineer to check.
 - The custom list (EDL) limit is the same on every model, so a larger model does not fix it.

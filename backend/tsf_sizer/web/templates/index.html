@@ -6,7 +6,7 @@
   <div>
     <p class="eyebrow">New analysis</p>
     <h1>Size a replacement firewall</h1>
-    <p>Drop a Tech Support File: the tool reads usage, config and ports, and picks the right model from the current portfolio.</p>
+    <p>Answer a few questions about the customer, then drop the Tech Support File. The tool reads usage, config and ports; an agent reasons with you before it recommends a model from the current portfolio.</p>
   </div>
   {% if portfolio %}
   <a class="chip chip-good" href="/portfolio" title="Active capacity workbook">{{ icon('database', 'icon-sm') }} {{ portfolio.filename }} · PAN-OS {{ portfolio.panos_release }}</a>
@@ -22,9 +22,16 @@
 
 <form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="split">
   <section class="card hero-upload reveal" aria-labelledby="upload-h">
-    <div class="steps" aria-hidden="true"><span><b>1</b> Upload TSF</span><span><b>2</b> Tune assumptions</span><span><b>3</b> Get the report</span></div>
-    <h2 id="upload-h" class="sr-only">Upload</h2>
+    <div class="steps" aria-hidden="true"><span><b>1</b> Sizing input</span><span><b>2</b> Upload TSF</span><span><b>3</b> Reason with the agent</span></div>
+    <h2 id="upload-h" class="sr-only">Sizing input and upload</h2>
 
+    <div class="stack sizing-box">
+      <p class="eyebrow">Step 1 · Before the analysis</p>
+      <p class="hint" style="margin-top:-4px">Tell us what the customer needs. It shapes the first result and the questions the agent does not have to ask.</p>
+      {% include "_sizing_input.html" %}
+    </div>
+
+    <p class="eyebrow" style="margin-top:6px">Step 2 · The Tech Support File</p>
     <label class="dropzone" for="tsf">
       <span class="icon-bubble">{{ icon('upload', 'icon-lg') }}</span>
       <strong data-title>Drop the Tech Support File here, or <span class="browse">browse</span></strong>

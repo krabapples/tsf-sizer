@@ -25,8 +25,9 @@ MAX_TOOL_CHARS = 20000
 MAX_VERDICT_ATTEMPTS = 3
 MAX_MESSAGE = 2000
 START_TEXT = (
-    "A new analysis is ready. Read the evidence, tell me briefly what you see, and ask what you "
-    "need to know before sizing."
+    "A new analysis is ready. The engineer already gave the sizing input that is in the "
+    "assumptions ledger (source 'form') and the notes below: do not ask for it again. Read the "
+    "evidence, tell me briefly what you see, and ask only what is still open."
 )
 KIND_TEXT = {
     "auth": "The AI gateway refused the credentials. Check the gateway key and its permissions.",
@@ -57,7 +58,12 @@ def add_message(
     return cur.lastrowid
 
 
-def start_run(conn: sqlite3.Connection, analysis_id: int, user_text: str | None) -> int:
+def start_run(
+    conn: sqlite3.Connection,
+    analysis_id: int,
+    user_text: str | None,
+    notes: str | None = None,
+) -> int:
     """Create a run and store what starts it. The caller then submits run_agent()."""
     cfg = cfgmod.from_env()
     run_id = conn.execute(
@@ -65,7 +71,11 @@ def start_run(conn: sqlite3.Connection, analysis_id: int, user_text: str | None)
         (analysis_id, cfg.mode, cfg.model),
     ).lastrowid
     if user_text is None:
-        add_message(conn, analysis_id, run_id, "user", START_TEXT, kind="start")
+        text = START_TEXT + (f"\n\nThe engineer's notes: {notes}" if notes else "")
+        add_message(
+            conn, analysis_id, run_id, "user", text, kind="start",
+            data={"notes": notes} if notes else None,
+        )  # fmt: skip
     else:
         add_message(conn, analysis_id, run_id, "user", user_text[:MAX_MESSAGE])
     conn.commit()
@@ -204,7 +214,9 @@ def _run(conn, analysis_id: int, run_id: int, cfg: cfgmod.LLMConfig, client: Gat
     attempts = 0
     steps = 0
     while steps < cfg.max_steps:
-        system = prompts.build(playbook.active(conn), ledger.values(conn, analysis_id), box.current)
+        system = prompts.build(
+            playbook.active(conn), ledger.effective(conn, analysis_id), box.current
+        )
         reply = client.chat(_messages(conn, analysis_id, run_id, system), SPECS)
         if client.fell_back and not getattr(client, "_said_fallback", False):
             client._said_fallback = True

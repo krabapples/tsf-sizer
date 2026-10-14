@@ -1,0 +1,46 @@
+{# What the engineer knows before the analysis. These answers go into the assumptions ledger
+   (source: form) and to the agent, so neither asks again. #}
+{% from "_icons.html" import icon %}
+<fieldset class="field sizing-input" style="border:0;padding:0;margin:0">
+  <legend class="label" style="margin-bottom:8px">What does the customer want?</legend>
+  <div class="segmented segmented-wide">
+    <label><input type="radio" name="goal" value="match_or_beat" checked>Like for like, or bigger</label>
+    <label><input type="radio" name="goal" value="usage_only">A smaller or cheaper box</label>
+  </div>
+  <p class="hint">Like for like or bigger: the new model must match or beat every limit of the current one. A smaller box: it only has to cover what is in use today plus growth.</p>
+</fieldset>
+
+<fieldset class="field sizing-input" style="border:0;padding:0;margin:0">
+  <legend class="label" style="margin-bottom:8px">Optical ports (SFP, SFP+, QSFP)</legend>
+  <div class="segmented segmented-wide">
+    <label><input type="radio" name="optics" value="keep" checked>Needed as today</label>
+    <label><input type="radio" name="optics" value="none">Not needed any more</label>
+  </div>
+</fieldset>
+
+<div class="field">
+  <label for="port_add_text">Extra ports needed <span class="opt">optional</span></label>
+  <input id="port_add_text" name="port_add_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. 10G_SFP+=2, 1G_RJ45=4">
+  <p class="hint">On top of today's layout: port class = count, separated by commas.</p>
+</div>
+
+<div class="field">
+  <label for="notes">Anything else the agent should know <span class="opt">optional</span></label>
+  <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="e.g. Branch office, 200 users, moving to SD-WAN next year. Budget is tight."></textarea>
+  <p class="hint">The agent reads this before it looks at the Tech Support File. Do not put customer names or addresses here.</p>
+</div>
+
+<details class="disclosure">
+  <summary><span>Models to include or leave out</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+  <div class="body grid-2" style="gap:14px">
+    <div class="field">
+      <label for="only_models_text">Only consider</label>
+      <input id="only_models_text" name="only_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-3500">
+    </div>
+    <div class="field">
+      <label for="exclude_models_text">Leave out</label>
+      <input id="exclude_models_text" name="exclude_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-5400, variant:5G">
+    </div>
+    <p class="hint" style="grid-column:1/-1">Model or family names separated by commas. <code>variant:5G</code>, <code>variant:rugged</code> and <code>variant:poe</code> leave out a kind of model.</p>
+  </div>
+</details>

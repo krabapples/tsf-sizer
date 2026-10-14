@@ -303,7 +303,8 @@ def _everyone(result):
     return {c.model: c for c in shown if c}
 
 
-def test_lre_not_supported_is_a_notice_not_a_reason_to_exclude(sized_db):
+def test_lre_is_not_compared_at_all(sized_db):
+    # An older stored analysis or workbook import may still carry the feature: it is ignored.
     _map(sized_db, "feature.lre_routing", "Legacy Routing Engine (LRE) Support",
          {"PA-450R": True, "PA-3430": False}, "feature")  # fmt: skip
     s = summary_as("PA-450R")
@@ -312,10 +313,7 @@ def test_lre_not_supported_is_a_notice_not_a_reason_to_exclude(sized_db):
     cand = _everyone(result)["PA-3430"]
     assert result.recommended.model == "PA-3430"
     assert not any("Legacy Routing" in f for f in cand.failures)
-    assert any(
-        "Legacy Routing Engine" in n and "Advanced Routing Engine" in n for n in cand.notices
-    )
-    assert any(n.startswith("PA-3430: The Legacy Routing Engine") for n in result.notes)
+    assert not any("Routing Engine" in n for n in cand.notices + result.notes)
 
 
 def test_aggregate_interfaces_never_block_a_pa800_replacement(sized_db):

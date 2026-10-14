@@ -496,6 +496,7 @@ class Toolbox:
             out["features_in_use"] = sorted(
                 k.removeprefix("feature.") for k, m in s.metrics.items()
                 if k.startswith("feature.") and m.value is True
+                and k not in engine.IGNORED_FEATURES
             )  # fmt: skip
             if not rows:
                 no_data.append("usage")
@@ -767,6 +768,8 @@ class Toolbox:
         unknown_features = []
         for fkey, m in self.summary.metrics.items():
             if not (fkey.startswith("feature.") and m.value is True):
+                continue
+            if fkey in engine.IGNORED_FEATURES:
                 continue
             cap = caps.get(fkey)
             name = fkey.removeprefix("feature.").replace("_", " ")
