@@ -291,6 +291,7 @@ details.disclosure > .body { padding: 4px 16px 18px; }
 .table tbody tr { transition: background-color .12s; }
 .table tbody tr:hover { background: var(--surface-2); }
 .reasons { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; }
+.reasons .reason-extra { display: none; }
 
 /* ------------------------------------------------------------------ meters & status */
 .meter { display: flex; align-items: center; gap: 10px; min-width: 170px; }
@@ -491,7 +492,12 @@ details.more > summary::-webkit-details-marker { display: none; }
   .table th, .table td { padding: 4px 5px; overflow-wrap: break-word; word-break: normal; }
   .table thead { display: table-header-group; }
   .table thead th { position: static; white-space: normal; font-size: 6.5pt; letter-spacing: 0; }
-  .table .nowrap { white-space: normal; }
+  .table th.nowrap { white-space: nowrap; width: 1%; }
+  /* Why a model does not qualify: every reason, as one flowing paragraph per model. */
+  .reasons { display: block; list-style: none; margin: 0; padding: 0; line-height: 1.35; }
+  .reasons li, .reasons .reason-extra { display: inline; }
+  .reasons li + li:not(.reason-more)::before { content: "\00a0\00a0\2022\00a0 "; color: #999; }
+  .reasons .reason-more { display: none; }
   .meter { min-width: 0; }
   .meter-track { display: none; }  /* the percentage stays; the bar costs a column of width */
   .reveal, .meter-fill, .spec-bar i { animation: none !important; }
@@ -534,6 +540,7 @@ details.more > summary::-webkit-details-marker { display: none; }
 .chat-form textarea { flex: 1; resize: vertical; min-height: 52px; font: inherit; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); color: var(--ink); }
 .examples { display: flex; flex-wrap: wrap; gap: 6px 8px; }
 .examples .example { border: 0; cursor: pointer; font: inherit; }
+.upload-single { max-width: 860px; }
 .segmented-wide { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .sizing-box { padding: 4px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .step-line { display: flex; gap: 8px; align-items: center; padding: 4px 10px; font-size: .84rem; color: var(--muted); border-left: 2px solid var(--border); margin-left: 6px; }

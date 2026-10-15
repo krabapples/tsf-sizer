@@ -328,3 +328,24 @@ def test_ledger_needs_a_finished_analysis(client):
     assert client.post("/analyses/999/ledger/years", data={"value": "4"}).status_code == 404
     assert client.post("/analyses/999/ledger/undo").status_code == 404
     assert client.post(f"/analyses/{analysis_id}/ledger/undo").status_code == 409
+
+
+def test_every_reason_for_a_rejected_model_is_in_the_page_for_the_printout(client):
+    aid = int(upload(client).headers["location"].rsplit("/", 1)[1])
+    wait_done(client, aid)
+    report = client.get(f"/analyses/{aid}/report.json").json()["sizing"]
+    page = client.get(f"/analyses/{aid}").text
+    many = [c for c in report["rejected"] if len(c["failures"]) > 4]
+    assert many, "the sample should reject a model for more than four reasons"
+    for cand in many:
+        for reason in cand["failures"]:
+            assert reason.replace("'", "&#39;") in page or reason in page
+    assert 'class="reason-extra"' in page and "all are listed on the printout" in page
+    assert "None</span>" not in page  # a model without a family shows no 'None'
+
+
+def test_the_upload_page_has_no_separate_options_panel(client):
+    page = client.get("/").text
+    assert "Sizing options" not in page and 'aria-label="Sizing options"' not in page
+    for name in ("growth_pct", "years", "peak_throughput_mbps", "need_poe", "goal", "notes"):
+        assert f'name="{name}"' in page

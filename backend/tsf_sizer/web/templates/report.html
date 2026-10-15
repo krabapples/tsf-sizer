@@ -122,7 +122,7 @@
       <div>
         <span class="chip chip-primary">{{ icon('check', 'icon-sm') }}Recommendation</span>
         <p class="rec-model">{{ rc.model or 'No model fits' }}</p>
-        {% if vv.rec_fit %}<p class="rec-family">{{ vv.rec_fit.family }} family{% if vv.rec_fit.variants %} · {{ vv.rec_fit.variants|join(', ') }} variant{% endif %}</p>{% endif %}
+        {% if vv.rec_fit %}<p class="rec-family">{% if vv.rec_fit.family %}{{ vv.rec_fit.family }} family{% endif %}{% if vv.rec_fit.variants %} · {{ vv.rec_fit.variants|join(', ') }} variant{% endif %}</p>{% endif %}
       </div>
       <div>
         {% if vd.confidence %}<span class="chip {{ {'high': 'chip-good', 'medium': 'chip-warn', 'low': 'chip-crit'}[vd.confidence.level] }}" title="{{ vd.confidence.reason }}">confidence: {{ vd.confidence.level }}</span>{% endif %}
@@ -190,7 +190,7 @@
         <div>
           <span class="chip {{ 'chip-primary' if loop.first else '' }}">{% if loop.first %}{{ icon('check', 'icon-sm') }}{% endif %}{{ c.tier }}</span>
           <p class="rec-model">{{ c.model }}</p>
-          <p class="rec-family">{{ c.family }} family{% if c.variants %} · {{ c.variants|join(', ') }} variant{% endif %}</p>
+          <p class="rec-family">{% if c.family %}{{ c.family }} family{% endif %}{% if c.variants %} · {{ c.variants|join(', ') }} variant{% endif %}</p>
         </div>
         {% if c.dedicated_ha %}<span class="chip chip-good" title="Dedicated HA ports">{{ icon('plug', 'icon-sm') }}HA ports</span>{% endif %}
       </div>
@@ -303,7 +303,7 @@
       <thead><tr><th scope="col">Model</th><th scope="col">Why not</th></tr></thead>
       <tbody>
       {% for c in v.rejected %}
-        <tr><th scope="row" class="nowrap">{{ c.model }}<br><span class="muted xs">{{ c.family }}</span></th><td><ul class="reasons">{% for reason in c.reasons[:4] %}<li>{{ reason }}</li>{% endfor %}{% if c.reasons|length > 4 %}<li class="muted">+{{ c.reasons|length - 4 }} more</li>{% endif %}</ul></td></tr>
+        <tr><th scope="row" class="nowrap">{{ c.model }}{% if c.family %}<br><span class="muted xs">{{ c.family }}</span>{% endif %}</th><td><ul class="reasons">{% for reason in c.reasons %}<li {% if loop.index > 4 %}class="reason-extra"{% endif %}>{{ reason }}</li>{% endfor %}{% if c.reasons|length > 4 %}<li class="muted reason-more">+{{ c.reasons|length - 4 }} more (all are listed on the printout)</li>{% endif %}</ul></td></tr>
       {% endfor %}
       </tbody>
     </table>

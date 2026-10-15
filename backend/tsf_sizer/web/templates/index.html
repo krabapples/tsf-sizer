@@ -20,7 +20,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="split">
+<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="upload-single">
   <section class="card hero-upload reveal" aria-labelledby="upload-h">
     <div class="steps" aria-hidden="true"><span><b>1</b> Sizing input</span><span><b>2</b> Upload TSF</span><span><b>3</b> Reason with the agent</span></div>
     <h2 id="upload-h" class="sr-only">Sizing input and upload</h2>
@@ -62,14 +62,6 @@
     </div>
   </section>
 
-  <aside class="stack reveal" aria-label="Sizing options">
-    <section class="card stack">
-      <div class="section-title"><span class="icon-bubble">{{ icon('sliders') }}</span><h2>Options</h2></div>
-
-      {% set opts = defaults %}{% set open_assumptions = false %}
-      {% include "_options.html" %}
-    </section>
-  </aside>
 </form>
 
 <section class="card reveal" aria-labelledby="hist-h" id="history">
