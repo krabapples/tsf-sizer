@@ -102,13 +102,13 @@
   {% endif %}
   {% endif %}
   <details class="disclosure no-print">
-    <summary><span>Add customer documents (PDF, screenshots)</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+    <summary><span>Add customer documents (PDF, Word, Excel, PowerPoint, screenshots)</span>{{ icon('chevron-down', 'icon chev') }}</summary>
     <form method="post" action="/analyses/{{ a.id }}/documents" enctype="multipart/form-data" class="body stack">
       <label class="dropzone dropzone-sm" for="documents-add">
         <span class="icon-bubble">{{ icon('upload') }}</span>
-        <span><strong data-title>Choose PDF files or screenshots</strong>
+        <span><strong data-title>Choose files</strong>
           <span class="hint" data-sub>Read inside the container. {% if llm.enabled %}The agent is asked to read them and use the figures that matter.{% else %}They appear on the Evidence tab.{% endif %}</span></span>
-        <input id="documents-add" name="documents" type="file" multiple required accept=".pdf,.png,.jpg,.jpeg">
+        <input id="documents-add" name="documents" type="file" multiple required accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx,.odt,.ods,.txt,.csv,.log,.md">
       </label>
       <div><button class="btn btn-primary" type="submit">{{ icon('upload') }}<span>Add and read</span></button></div>
     </form>
@@ -370,7 +370,7 @@
     <summary>{{ icon('chevron-down', 'icon-sm') }}<strong>{{ d.filename }}</strong>
       {% if d.status == 'reading' %}<span class="chip chip-warn"><span class="spinner"></span> reading…</span>
       {% elif d.status == 'error' %}<span class="chip chip-crit">could not be read</span>
-      {% else %}<span class="muted small">{{ d.kind|upper }} · {{ d.pages }} page(s) · {{ d.chars|num }} characters · {{ d.method }}</span>{% endif %}
+      {% else %}<span class="muted small">{{ kind_labels.get(d.kind, d.kind) }} · {{ d.pages }} page(s) · {{ d.chars|num }} characters · {{ d.method }}</span>{% endif %}
       <span class="muted xs">id {{ d.id }}</span></summary>
     <div class="body">
       {% for w in d.warnings %}<p class="small" style="color:var(--warn)">{{ icon('alert', 'icon-sm') }} {{ w }}</p>{% endfor %}

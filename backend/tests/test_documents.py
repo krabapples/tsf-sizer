@@ -3,7 +3,15 @@ import shutil
 import time
 
 import pytest
-from docfiles import image_pdf_bytes, png_bytes, text_pdf_bytes
+from docfiles import (
+    docx_bytes,
+    image_pdf_bytes,
+    odt_bytes,
+    png_bytes,
+    pptx_bytes,
+    text_pdf_bytes,
+    xlsx_bytes,
+)
 from fake_gateway import text_reply, tool_reply
 from test_manual import FORM
 from test_web import client as _web_client
@@ -62,7 +70,11 @@ def test_without_ocr_a_screenshot_is_reported_not_silently_empty(tmp_path, monke
 
 def test_only_pdf_and_images_and_damaged_files_are_refused(tmp_path):
     for name, data, message in [
-        ("n.txt", b"hello", "not a PDF, PNG or JPEG"),
+        ("n.exe", b"MZ\x90\x00", "not a supported file"),
+        ("n.txt", b"bin\x00ary", "not a text file"),
+        ("old.doc", b"\xd0\xcf\x11\xe0abcd", "save it as .docx"),
+        ("old.xls", b"hello", "save it as .xlsx"),
+        ("z.docx", b"PK\x03\x04junk", "damaged"),
         ("x.pdf", b"%PDF-1.4 this is not a pdf", "damaged or password protected"),
         ("x.png", b"\x89PNG\r\n\x1a\n" + b"junk", "cannot be read"),
     ]:
@@ -95,12 +107,12 @@ def test_process_stores_results_and_failures_and_deletes_the_files(tmp_path):
     conn.commit()
     items = [
         (good, write(tmp_path, "g.pdf", text_pdf_bytes(["Hello 42"])), "good.pdf"),
-        (bad, write(tmp_path, "b.txt", b"nope"), "bad.txt"),
+        (bad, write(tmp_path, "b.exe", b"nope"), "bad.exe"),
     ]
     documents.process(path, items)
     rows = {d["id"]: d for d in documents.list_for(conn, 1)}
     assert rows[good]["status"] == "done" and rows[good]["pages_data"][0]["text"] == "Hello 42"
-    assert rows[bad]["status"] == "error" and "not a PDF" in rows[bad]["warnings"][0]
+    assert rows[bad]["status"] == "error" and "not a supported file" in rows[bad]["warnings"][0]
     assert not any(p.exists() for _, p, _ in items)
 
 
@@ -309,7 +321,7 @@ def test_documents_added_later_ask_the_agent_to_read_them(client, llm_env):
     assert "I added 1 customer document(s), ids 1" in last_user["content"]
     assert "later.pdf" not in json.dumps(llm_env.requests[-1]["body"])
     bad = client.post(
-        f"/analyses/{aid}/documents", files=[("documents", ("x.txt", b"hi", "text/plain"))]
+        f"/analyses/{aid}/documents", files=[("documents", ("x.exe", b"hi", "text/plain"))]
     )
     assert bad.status_code == 400
     assert client.post("/analyses/99/documents", files=[]).status_code in (404, 422)
@@ -325,3 +337,152 @@ def test_the_pages_offer_documents_and_show_the_ocr_status(client):
     settings = client.get("/settings").text
     assert "Reading customer documents" in settings
     assert "TSF_SIZER_AGENT_ALLOW_DOCUMENTS" in settings
+
+
+# --------------------------------------------------------------------------- Office and text files
+
+
+def test_a_word_file_is_read_in_order_with_tables(tmp_path):
+    data = docx_bytes(
+        ["Performance summary", "Peak throughput was 1850 Mbps in week 42."],
+        table=[["Metric", "Max"], ["Sessions", "143000"], ["CPU %", "61"]],
+    )
+    r = documents.extract(write(tmp_path, "w.docx", data), "w.docx")
+    text = r.pages[0].text
+    assert r.kind == "docx" and r.method == "text"
+    assert (
+        text.index("Performance summary")
+        < text.index("1850 Mbps")
+        < text.index("Sessions | 143000")
+    )
+    assert "Metric | Max" in text and "CPU % | 61" in text
+
+
+@needs_ocr
+def test_a_screenshot_inside_a_word_file_is_read_with_ocr(tmp_path):
+    data = docx_bytes(["See the screenshot."], picture=png_bytes())
+    r = documents.extract(write(tmp_path, "w.docx", data), "w.docx")
+    assert r.method == "ocr+text" or r.method == "text+ocr"
+    picture_page = next(p for p in r.pages if p.method == "ocr")
+    assert "1,850" in picture_page.text and "picture in the document" in picture_page.text
+
+
+def test_without_ocr_pictures_in_word_files_are_reported(tmp_path, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    data = docx_bytes(["Text"], picture=png_bytes())
+    r = documents.extract(write(tmp_path, "w.docx", data), "w.docx")
+    assert any("OCR is not installed" in w for w in r.warnings)
+
+
+def test_an_excel_file_is_read_sheet_by_sheet(tmp_path):
+    data = xlsx_bytes(
+        {
+            "Load": [
+                ["Metric", "Avg", "Max"],
+                ["Mbps", 812, 1850],
+                [None, None, None],
+                ["CPS", 2450, 6100],
+            ],
+            "Empty": [],
+        }
+    )
+    r = documents.extract(write(tmp_path, "x.xlsx", data), "x.xlsx")
+    text = "\n".join(p.text for p in r.pages)
+    assert r.kind == "xlsx" and "Sheet: Load" in text
+    assert "Mbps | 812 | 1850" in text and "CPS | 2450 | 6100" in text and "Empty" not in text
+    assert any("Charts and pictures" in w for w in r.warnings)
+
+
+def test_a_powerpoint_file_is_read_slide_by_slide(tmp_path):
+    data = pptx_bytes([["Customer review", "Peak 1850 Mbps"], ["Plan", "Replace in Q2"]])
+    r = documents.extract(write(tmp_path, "p.pptx", data), "p.pptx")
+    assert r.kind == "pptx" and len(r.pages) == 2
+    assert r.pages[0].text.startswith("Slide 1") and "Peak 1850 Mbps" in r.pages[0].text
+    assert "Replace in Q2" in r.pages[1].text
+
+
+@needs_ocr
+def test_a_picture_on_a_slide_is_read_into_that_slide(tmp_path):
+    data = pptx_bytes([["Intro"], ["Panorama"]], picture_on_slide=(2, png_bytes()))
+    r = documents.extract(write(tmp_path, "p.pptx", data), "p.pptx")
+    assert "1,850" in r.pages[1].text and "1,850" not in r.pages[0].text
+
+
+def test_an_opendocument_text_file_and_plain_text(tmp_path):
+    r = documents.extract(write(tmp_path, "o.odt", odt_bytes(["Max 1850 Mbps", "Second"])), "o.odt")
+    assert r.kind == "odt" and "Max 1850 Mbps" in r.pages[0].text and "Second" in r.pages[0].text
+    r = documents.extract(write(tmp_path, "d.csv", b"metric,max\nmbps,1850\n"), "d.csv")
+    assert r.kind == "text" and "mbps,1850" in r.pages[0].text
+
+
+def test_long_texts_are_split_into_pages(tmp_path):
+    text = "\n".join(f"line {i} " + "x" * 50 for i in range(300))
+    r = documents.extract(write(tmp_path, "l.txt", text.encode()), "l.txt")
+    assert len(r.pages) > 3 and all(len(p.text) <= documents.PAGE_CHARS for p in r.pages)
+    assert "line 299" in r.pages[-1].text
+
+
+def test_hostile_xml_is_refused(tmp_path):
+    bomb = (
+        b'<?xml version="1.0"?><!DOCTYPE d [<!ENTITY a "aaaa"><!ENTITY b "&a;&a;&a;&a;">]>'
+        b"<w:document><w:body>&b;</w:body></w:document>"
+    )
+    data = docx_bytes(["x"])
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", bomb)
+    with pytest.raises(documents.DocumentError, match="XML that is not accepted"):
+        documents.extract(write(tmp_path, "b.docx", buf.getvalue()), "b.docx")
+    assert data  # the normal builder still works
+
+
+def test_a_zip_that_is_not_office_is_refused(tmp_path):
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("hello.txt", "hi")
+    with pytest.raises(documents.DocumentError, match="not a Word, Excel or PowerPoint"):
+        documents.extract(write(tmp_path, "z.docx", buf.getvalue()), "z.docx")
+
+
+def test_legacy_office_files_are_refused_at_upload_with_what_to_do(client):
+    for name, hint in (
+        ("a.doc", ".docx"),
+        ("a.xls", ".xlsx"),
+        ("a.ppt", ".pptx"),
+        ("a.rtf", "docx"),
+    ):
+        r = post_manual(client, [("documents", (name, b"\xd0\xcf\x11\xe0", "application/msword"))])
+        assert r.status_code == 400 and hint in r.text, (name, r.text)
+
+
+@needs_ocr
+def test_office_files_sent_with_an_analysis_are_read_and_shown(client):
+    files = [
+        (
+            "documents",
+            (
+                "report.docx",
+                docx_bytes(["Peak 1850 Mbps"], picture=png_bytes()),
+                "application/octet-stream",
+            ),
+        ),
+        (
+            "documents",
+            ("load.xlsx", xlsx_bytes({"Load": [["Mbps", 1850]]}), "application/octet-stream"),
+        ),
+    ]
+    r = post_manual(client, files)
+    assert r.status_code == 303
+    aid = int(r.headers["location"].rsplit("/", 1)[1])
+    wait_docs(client, aid)
+    page = client.get(f"/analyses/{aid}").text
+    assert "report.docx" in page and "Word" in page and "Excel" in page
+    assert "Peak 1850 Mbps" in page and "Mbps | 1850" in page and "6,100" in page
+    index = client.get("/").text
+    assert ".docx" in index and "Word, Excel, PowerPoint" in index

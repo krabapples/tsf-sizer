@@ -83,3 +83,77 @@ def text_pdf_bytes(pages: list[str]) -> bytes:
         out += b"%010d 00000 n \n" % off
     out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
     return bytes(out)
+
+
+def _zip(files: dict[str, bytes]) -> bytes:
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+    return buf.getvalue()
+
+
+W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+
+
+def docx_bytes(
+    paragraphs: list[str], table: list[list[str]] | None = None, picture: bytes | None = None
+) -> bytes:
+    body = "".join(f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paragraphs)
+    if table:
+        rows = "".join(
+            "<w:tr>"
+            + "".join(f"<w:tc><w:p><w:r><w:t>{c}</w:t></w:r></w:p></w:tc>" for c in row)
+            + "</w:tr>"
+            for row in table
+        )
+        body += f"<w:tbl>{rows}</w:tbl>"
+    files = {
+        "[Content_Types].xml": b"<Types/>",
+        "word/document.xml": f"<w:document {W}><w:body>{body}</w:body></w:document>".encode(),
+    }
+    if picture:
+        files["word/media/image1.png"] = picture
+    return _zip(files)
+
+
+def xlsx_bytes(sheets: dict[str, list[list]]) -> bytes:
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    for name, rows in sheets.items():
+        ws = wb.create_sheet(name)
+        for row in rows:
+            ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def pptx_bytes(slides: list[list[str]], picture_on_slide: tuple[int, bytes] | None = None) -> bytes:
+    A = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+    files = {"ppt/presentation.xml": b"<p/>"}
+    for i, paras in enumerate(slides, 1):
+        runs = "".join(f"<a:p><a:r><a:t>{t}</a:t></a:r></a:p>" for t in paras)
+        files[f"ppt/slides/slide{i}.xml"] = f"<sld {A}><txBody>{runs}</txBody></sld>".encode()
+    if picture_on_slide:
+        n, data = picture_on_slide
+        files["ppt/media/image1.png"] = data
+        files[f"ppt/slides/_rels/slide{n}.xml.rels"] = (
+            b'<Relationships><Relationship Id="rId1" Target="../media/image1.png"/></Relationships>'
+        )
+    return _zip(files)
+
+
+def odt_bytes(paragraphs: list[str]) -> bytes:
+    body = "".join(f"<text:p>{p}</text:p>" for p in paragraphs)
+    xml = (
+        '<office:document-content xmlns:office="urn:o" xmlns:text="urn:t">'
+        f"<office:body>{body}</office:body></office:document-content>"
+    )
+    return _zip(
+        {"mimetype": b"application/vnd.oasis.opendocument.text", "content.xml": xml.encode()}
+    )

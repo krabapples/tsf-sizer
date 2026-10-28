@@ -13,6 +13,7 @@ import sqlite3
 from dataclasses import asdict
 from typing import Any
 
+from .. import documents
 from ..portfolio import catalog
 from ..sizing import engine
 from ..sizing.engine import Requirement, SizingParams
@@ -691,7 +692,9 @@ class Toolbox:
             rows.append(
                 {
                     "document_id": r["id"],
-                    "label": f"Document {r['id']} ({'PDF' if r['kind'] == 'pdf' else 'image'})",
+                    "label": "Document {} ({})".format(
+                        r["id"], documents.KIND_LABELS.get(r["kind"], r["kind"])
+                    ),
                     "status": r["status"],
                     "pages": r["pages"],
                     "characters": r["chars"],

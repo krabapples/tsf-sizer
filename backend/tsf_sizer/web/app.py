@@ -157,8 +157,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             for u in files:
                 ext = Path(u.filename).suffix.lower()
+                if ext in documents.LEGACY:
+                    raise HTTPException(400, f"{u.filename}: {documents.LEGACY[ext]}")
                 if ext not in documents.EXTENSIONS:
-                    raise HTTPException(400, f"{u.filename}: only PDF, PNG and JPEG files")
+                    raise HTTPException(
+                        400,
+                        f"{u.filename}: not a supported file. Use PDF, PNG, JPEG, Word (.docx), "
+                        "Excel (.xlsx), PowerPoint (.pptx), OpenDocument or a text file",
+                    )
                 saved.append((await save_upload(u, ext), Path(u.filename).name[:200]))
         except HTTPException:
             for path, _ in saved:
@@ -494,6 +500,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             docs=docs,
             docs_reading=any(d["status"] == "reading" for d in docs),
             ocr=documents.ocr_status(),
+            kind_labels=documents.KIND_LABELS,
             examples=EXAMPLES,
             last_id=messages[-1]["id"] if messages else 0,
         )
