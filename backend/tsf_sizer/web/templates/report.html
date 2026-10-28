@@ -101,6 +101,18 @@
   </div>
   {% endif %}
   {% endif %}
+  <details class="disclosure no-print">
+    <summary><span>Add customer documents (PDF, screenshots)</span>{{ icon('chevron-down', 'icon chev') }}</summary>
+    <form method="post" action="/analyses/{{ a.id }}/documents" enctype="multipart/form-data" class="body stack">
+      <label class="dropzone dropzone-sm" for="documents-add">
+        <span class="icon-bubble">{{ icon('upload') }}</span>
+        <span><strong data-title>Choose PDF files or screenshots</strong>
+          <span class="hint" data-sub>Read inside the container. {% if llm.enabled %}The agent is asked to read them and use the figures that matter.{% else %}They appear on the Evidence tab.{% endif %}</span></span>
+        <input id="documents-add" name="documents" type="file" multiple required accept=".pdf,.png,.jpg,.jpeg">
+      </label>
+      <div><button class="btn btn-primary" type="submit">{{ icon('upload') }}<span>Add and read</span></button></div>
+    </form>
+  </details>
 </section>
 
 <nav class="panel-tabs no-print" role="tablist" aria-label="Report sections">
@@ -349,6 +361,29 @@
 </div>
 
 <div class="panel" id="panel-evidence" data-panel="evidence">
+{% if docs %}
+<section id="documents" aria-labelledby="docs-h">
+  <div class="section-title"><span class="icon-bubble">{{ icon('list') }}</span><div><h2 id="docs-h">Customer documents</h2><p class="muted small">Read inside the container{% if ocr.available %} (text layer, and OCR of screenshots){% else %}; OCR is not installed here, so text inside screenshots was not read{% endif %}. OCR can misread digits: check figures against the original.</p></div></div>
+  <div class="stack">
+  {% for d in docs %}
+  <details class="more doc" data-print-open>
+    <summary>{{ icon('chevron-down', 'icon-sm') }}<strong>{{ d.filename }}</strong>
+      {% if d.status == 'reading' %}<span class="chip chip-warn"><span class="spinner"></span> reading…</span>
+      {% elif d.status == 'error' %}<span class="chip chip-crit">could not be read</span>
+      {% else %}<span class="muted small">{{ d.kind|upper }} · {{ d.pages }} page(s) · {{ d.chars|num }} characters · {{ d.method }}</span>{% endif %}
+      <span class="muted xs">id {{ d.id }}</span></summary>
+    <div class="body">
+      {% for w in d.warnings %}<p class="small" style="color:var(--warn)">{{ icon('alert', 'icon-sm') }} {{ w }}</p>{% endfor %}
+      {% for pg in d.pages_data %}
+      <p class="muted xs" style="margin:10px 0 2px">Page {{ pg.n }} · {{ pg.method }}</p>
+      <pre class="code-block doc-text">{{ pg.text or '(no text)' }}</pre>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
 <section id="usage" aria-labelledby="kpi-h">
   <div class="section-title"><span class="icon-bubble">{{ icon('activity') }}</span><h2 id="kpi-h">Current usage at a glance</h2></div>
   {% set kpi_icons = ['activity', 'layers', 'cpu', 'list', 'box', 'plug'] %}
@@ -457,6 +492,7 @@
     }).catch(function () { setTimeout(poll, 3000); });
   }
   if (working) setTimeout(poll, 1000);
+  {% if docs_reading %}setTimeout(function () { location.reload(); }, 3000);{% endif %}
 })();
 </script>
 {% endblock %}

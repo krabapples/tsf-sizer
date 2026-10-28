@@ -42,6 +42,12 @@ To keep the app reachable from this machine only, add `TSF_SIZER_BIND=127.0.0.1`
 
 Some customers cannot provide one. On the upload page choose **No file: I enter what I know**: give the current model and whatever you know (high availability, throughput and whether it is a peak, a typical value or an estimate, connections per second, concurrent sessions, interfaces in use by type, PoE, configuration counts), plus the same sizing input as for a file. Only the model is required. The analysis is marked as entered, not measured: nothing is guessed, a figure you leave out is listed as unverified, and the report says that CPU history, counters and licenses are unknown. With an LLM, the agent asks for the figures that matter most (peak throughput, sessions, interfaces, HA mode) and records your answers as evidence (`record_evidence`), then sizes as usual; it keeps its confidence at medium or lower unless the figures are peaks, and tells you to confirm with a Tech Support File before quoting.
 
+### Customer documents (PDF files and screenshots)
+
+Customers often send PDF files with text and screenshots of the Panorama GUI with performance graphs. Add them on the upload page (both modes, optional) or later on the analysis page (*Add customer documents*). They are read **inside the container**: the PDF text layer, plus OCR (tesseract, part of the Docker image) for pictures, screenshots and scanned pages. The text is stored with the analysis, shown on the **Evidence** tab and deleted with the analysis; the uploaded file is deleted after reading.
+
+With an LLM, the agent reads the documents page by page (`list_documents`, `read_document`), looks for peaks (the maximum of the longest range shown), watches units and time ranges, and **asks you to confirm** any figure that decides the model before it records it, citing the document and page. OCR can misread digits, so check against the original. Two sources that disagree are sized on the higher figure. The text the agent receives has IP addresses, host names, e-mail addresses and serial numbers masked, and file names are never sent. Set `TSF_SIZER_AGENT_ALLOW_DOCUMENTS=false` to keep documents away from the agent (they are still read and shown to you). Up to 10 files of 60 pages each; a PDF page with a picture is read with OCR, so large scanned files take a while.
+
 ### The agent (optional, needs an LLM through the AI gateway)
 
 Without an LLM the app gives a **quick result**: fixed rules applied to your assumptions, as before. With an LLM, every analysis also starts an **agent** that reasons with you before reaching a verdict:
@@ -79,6 +85,7 @@ TSF_SIZER_GATEWAY_MODEL=model-name-as-the-gateway-exposes-it
 | `TSF_SIZER_GATEWAY_TIMEOUT_S`, `_MAX_RETRIES` | `120`, `2` | Per request timeout; retries on timeouts, 429 and 5xx |
 | `TSF_SIZER_GATEWAY_TOOL_MODE` | `auto` | `native` tool calls, `json` (tool calls as JSON text), or `auto` (try native, fall back once) |
 | `TSF_SIZER_AGENT_MAX_STEPS` | `40` | Tool calls per run |
+| `TSF_SIZER_AGENT_ALLOW_DOCUMENTS` | `true` | The agent may read the text of customer documents (identifiers masked) |
 
 The **Settings** page lists these variables (secrets only as set or not set), has a **Test connection** button (a plain request and a request with a tool) and the playbook editor. If the gateway's security profile blocks a request, the agent stops and says so: it does not retry or rephrase. A 401 or 403 names the variables to check; 429 and transient errors are retried.
 

@@ -13,6 +13,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN useradd --uid 10001 --create-home app \
     && mkdir /data && chown app:app /data
 
+# OCR for screenshots in customer PDFs (runs inside the container).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/tsf_sizer ./tsf_sizer

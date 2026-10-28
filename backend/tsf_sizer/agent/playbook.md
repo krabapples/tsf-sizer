@@ -78,6 +78,17 @@ Look at the evidence for these and report what you find, even when it does not c
   points.
 - Use a larger growth margin when the figures are estimates, and say why.
 
+## Customer documents
+
+- Customers send PDF files and screenshots, for instance of the Panorama GUI with performance
+  graphs. They are read inside the container: the PDF text, plus OCR of pictures.
+- Look for peaks, not just the figure on screen: the maximum of the longest range shown beats an
+  average or the last hour. Say which range a figure comes from.
+- OCR misreads digits and units. Cross-check against other pages or figures, and have the
+  engineer confirm any figure that decides the model. Never record a figure you doubt.
+- If two sources disagree (for instance a Tech Support File snapshot and a screenshot peak),
+  size on the higher one and say why.
+
 ## Verdict
 
 - A recommendation names one model, or none if nothing fits, with the reason.

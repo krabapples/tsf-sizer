@@ -54,6 +54,15 @@
       <input id="config" name="config" type="file" accept=".xml">
     </label>
 
+    <label class="dropzone dropzone-sm" for="documents-tsf">
+      <span class="icon-bubble">{{ icon('list') }}</span>
+      <span>
+        <strong data-title>Customer documents <span class="opt">optional</span></strong>
+        <span class="hint" data-sub>PDF files or screenshots with performance figures, for instance from Panorama. Read inside the container; the agent gets the text with addresses and host names masked.</span>
+      </span>
+      <input id="documents-tsf" name="documents" type="file" multiple accept=".pdf,.png,.jpg,.jpeg">
+    </label>
+
     <div class="field">
       <label for="customer">Customer / opportunity <span class="opt">optional</span></label>
       <input id="customer" name="customer" type="text" maxlength="200" autocomplete="off" placeholder="e.g. ACME – branch refresh">
@@ -69,7 +78,7 @@
 
 </form>
 
-<form method="post" action="/analyses/manual" id="manual-form" class="upload-single mode-panel" data-mode="manual">
+<form method="post" action="/analyses/manual" enctype="multipart/form-data" id="manual-form" class="upload-single mode-panel" data-mode="manual">
   <section class="card hero-upload reveal" aria-labelledby="manual-h">
     <div class="steps" aria-hidden="true"><span><b>1</b> The current firewall</span><span><b>2</b> Sizing input</span><span><b>3</b> Reason with the agent</span></div>
     <h2 id="manual-h" class="sr-only">Sizing without a Tech Support File</h2>
@@ -85,6 +94,15 @@
       <p class="hint" style="margin-top:-4px">Tell us what the customer needs. It shapes the first result and the questions the agent does not have to ask.</p>
       {% set pfx = 'm-' %}{% set hide_peaks = true %}{% include "_sizing_input.html" %}
     </div>
+
+    <label class="dropzone dropzone-sm" for="documents-manual">
+      <span class="icon-bubble">{{ icon('list') }}</span>
+      <span>
+        <strong data-title>Customer documents <span class="opt">optional</span></strong>
+        <span class="hint" data-sub>PDF files or screenshots with performance figures, for instance from Panorama. Read inside the container; the agent gets the text with addresses and host names masked.</span>
+      </span>
+      <input id="documents-manual" name="documents" type="file" multiple accept=".pdf,.png,.jpg,.jpeg">
+    </label>
 
     <div class="field">
       <label for="m-customer">Customer / opportunity <span class="opt">optional</span></label>

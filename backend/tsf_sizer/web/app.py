@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import secrets
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -31,7 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import db
+from .. import db, documents
 from ..agent import config as llm_config
 from ..agent import ledger, playbook, runtime
 from ..agent.gateway import GatewayClient, GatewayError
@@ -146,6 +147,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             dest.unlink(missing_ok=True)
             raise HTTPException(400, f"{upload.filename or 'File'} is empty")
         return dest
+
+    async def save_documents(uploads) -> list[tuple[Path, str]]:
+        """Save the customer's PDFs and screenshots. All or nothing: a bad file removes the rest."""
+        files = [u for u in uploads if getattr(u, "filename", None)]
+        if len(files) > documents.MAX_DOCUMENTS:
+            raise HTTPException(400, f"At most {documents.MAX_DOCUMENTS} documents at a time")
+        saved: list[tuple[Path, str]] = []
+        try:
+            for u in files:
+                ext = Path(u.filename).suffix.lower()
+                if ext not in documents.EXTENSIONS:
+                    raise HTTPException(400, f"{u.filename}: only PDF, PNG and JPEG files")
+                saved.append((await save_upload(u, ext), Path(u.filename).name[:200]))
+        except HTTPException:
+            for path, _ in saved:
+                path.unlink(missing_ok=True)
+            raise
+        return saved
+
+    def queue_documents(analysis_id: int, saved: list[tuple[Path, str]]) -> list[int]:
+        """Record the files and read them in the background. Returns the document ids."""
+        if not saved:
+            return []
+        with conn() as c:
+            ids = [documents.add_pending(c, analysis_id, name) for _, name in saved]
+        items = [(i, p, n) for i, (p, n) in zip(ids, saved, strict=True)]
+        app.state.executor.submit(documents.process, settings.db_path, items)
+        return ids
+
+    def wait_for_documents(analysis_id: int, timeout: float = 600.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            with conn() as c:
+                pending = c.execute(
+                    "SELECT 1 FROM document WHERE analysis_id=? AND status='reading'",
+                    (analysis_id,),
+                ).fetchone()
+            if not pending:
+                return
+            time.sleep(0.5)
 
     # ------------------------------------------------------------------ pages
 
@@ -266,6 +307,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def create_analysis(
         tsf: UploadFile = File(...),
         config: UploadFile | None = File(None),
+        documents_upload: list[UploadFile] = File([], alias="documents"),
         customer: str = Form(""),
         growth_pct: float = Form(20.0),
         years: int = Form(3),
@@ -304,6 +346,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             only_models_text,
             exclude_models_text,
         )
+        saved_docs = await save_documents(documents_upload)
         tsf_path = await save_upload(tsf, ".tsf")
         config_path, config_name = None, None
         if config is not None and config.filename:
@@ -317,6 +360,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 (customer.strip()[:200] or None, filename, json.dumps(params.__dict__)),
             )
             analysis_id = cur.lastrowid
+        queue_documents(analysis_id, saved_docs)
         app.state.executor.submit(
             run_job,
             settings.db_path,
@@ -326,7 +370,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             params,
             filename,
             config_name,
-            lambda aid: start_agent(aid, notes=notes or None),
+            lambda aid: (wait_for_documents(aid), start_agent(aid, notes=notes or None)),
         )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
@@ -340,6 +384,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """An analysis without a Tech Support File: the engineer enters what is known."""
         form = await request.form()
         data = {k: v for k, v in form.items() if isinstance(v, str)}
+        saved_docs = await save_documents(form.getlist("documents"))
 
         def num(key: str, default: float) -> float:
             raw = data.get(key, "").strip().replace(",", "")
@@ -387,8 +432,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 analysis_id = cur.lastrowid
                 ledger.seed(c, analysis_id, params)
         except ValueError as e:
+            for path, _ in saved_docs:
+                path.unlink(missing_ok=True)
             raise HTTPException(400, str(e)) from None
-        start_agent(analysis_id, notes=notes or None)
+        queue_documents(analysis_id, saved_docs)
+        app.state.agent_executor.submit(
+            lambda: (wait_for_documents(analysis_id), start_agent(analysis_id, notes=notes or None))
+        )
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
     def start_agent(
@@ -427,6 +477,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             vv = agent_view.verdict_view(c, analysis_id, verdict)
             ledger_rows = agent_view.ledger_rows(c, analysis_id)
             ledger_history = ledger.history(c, analysis_id)
+            docs = documents.list_for(c, analysis_id)
         return render(
             request,
             "report.html",
@@ -440,6 +491,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             vv=vv,
             ledger_rows=ledger_rows,
             ledger_history=ledger_history,
+            docs=docs,
+            docs_reading=any(d["status"] == "reading" for d in docs),
+            ocr=documents.ocr_status(),
             examples=EXAMPLES,
             last_id=messages[-1]["id"] if messages else 0,
         )
@@ -514,6 +568,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"run_id": run_id}
         return RedirectResponse(f"/analyses/{analysis_id}#agent", status_code=303)
 
+    @app.post("/analyses/{analysis_id}/documents")
+    async def add_documents(
+        analysis_id: int, documents_upload: list[UploadFile] = File([], alias="documents")
+    ):
+        """Customer PDFs and screenshots added later; the agent is asked to read them."""
+        row = load(analysis_id)
+        if row["status"] != "done":
+            raise HTTPException(409, "The analysis is not finished")
+        saved = await save_documents(documents_upload)
+        if not saved:
+            raise HTTPException(400, "Choose at least one PDF or screenshot")
+        ids = queue_documents(analysis_id, saved)
+        text = (
+            f"I added {len(ids)} customer document(s), ids {', '.join(map(str, ids))}. Read "
+            "them and use the figures that matter."
+        )
+
+        def then_ask() -> None:
+            wait_for_documents(analysis_id)
+            start_agent(analysis_id, text)
+
+        app.state.agent_executor.submit(then_ask)
+        return RedirectResponse(f"/analyses/{analysis_id}#evidence", status_code=303)
+
     # ------------------------------------------------------------------ ledger
 
     @app.post("/analyses/{analysis_id}/ledger/undo")
@@ -565,6 +643,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "settings.html",
             cfg=cfg,
             variables=llm_config.status(cfg),
+            ocr=documents.ocr_status(),
             msg=msg,
             ok=ok,
             test=test,
@@ -609,7 +688,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def delete_analysis(analysis_id: int):
         load(analysis_id)
         with conn() as c:
-            for table in ("agent_message", "agent_run", "tool_result", "assumption", "verdict"):
+            for table in (
+                "agent_message", "agent_run", "tool_result", "assumption", "verdict", "document",
+            ):  # fmt: skip
                 c.execute(f"DELETE FROM {table} WHERE analysis_id=?", (analysis_id,))  # noqa: S608
             c.execute("DELETE FROM analysis WHERE id=?", (analysis_id,))
         return RedirectResponse("/", status_code=303)

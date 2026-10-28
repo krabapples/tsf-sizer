@@ -179,6 +179,23 @@ CREATE TABLE IF NOT EXISTS verdict (
 );
 CREATE INDEX IF NOT EXISTS verdict_by_analysis ON verdict (analysis_id, version);
 
+-- Files the customer sent (PDF, screenshots), read inside the container. The text belongs to
+-- the analysis and is deleted with it; the uploaded file itself is deleted after reading.
+CREATE TABLE IF NOT EXISTS document (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id   INTEGER NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    filename      TEXT NOT NULL,
+    kind          TEXT,                 -- pdf | image
+    status        TEXT NOT NULL DEFAULT 'reading',   -- reading | done | error
+    pages         INTEGER,
+    chars         INTEGER,
+    method        TEXT,                 -- text | ocr | text+ocr | empty
+    pages_json    TEXT,                 -- [{"n": 1, "text": "...", "method": "ocr"}]
+    warnings_json TEXT
+);
+CREATE INDEX IF NOT EXISTS document_by_analysis ON document (analysis_id, id);
+
 CREATE TABLE IF NOT EXISTS playbook_version (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),

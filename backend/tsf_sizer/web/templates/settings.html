@@ -42,6 +42,7 @@
       {% endfor %}
       </tbody>
     </table></div>
+    <p class="small muted" style="margin:0">Reading customer documents: {% if ocr.available %}<span class="status status-ok">OCR available</span> ({{ ocr.version }}){% else %}<span class="status status-warn">OCR not installed</span>: text inside screenshots is not read (the Docker image includes it){% endif %}. The agent may read the text of customer documents with addresses and host names masked: {{ 'on' if cfg.allow_documents else 'off' }} (<code>TSF_SIZER_AGENT_ALLOW_DOCUMENTS</code>).</p>
     <form method="post" action="/settings/test">
       <button class="btn btn-primary" type="submit">{{ icon('activity') }}<span>Test connection</span></button>
       <span class="small muted" style="margin-left:8px">Sends two tiny requests: a plain one and one with a tool.</span>

@@ -31,12 +31,14 @@
       var f = input.files && input.files[0];
       zone.classList.toggle('has-file', !!f);
       if (f) {
+        var many = input.files.length > 1, total = 0;
+        for (var k = 0; k < input.files.length; k++) total += input.files[k].size;
         title.innerHTML = '';
         var name = document.createElement('span');
         name.className = 'file-name';
-        name.textContent = f.name;
+        name.textContent = many ? input.files.length + ' files' : f.name;
         title.appendChild(name);
-        sub.textContent = fmtSize(f.size) + ' · click or drop to replace';
+        sub.textContent = fmtSize(many ? total : f.size) + ' · click or drop to replace';
       } else {
         title.innerHTML = original.title;
         sub.innerHTML = original.sub;

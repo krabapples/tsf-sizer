@@ -498,6 +498,7 @@ details.more > summary::-webkit-details-marker { display: none; }
   .reasons li, .reasons .reason-extra { display: inline; }
   .reasons li + li:not(.reason-more)::before { content: "\00a0\00a0\2022\00a0 "; color: #999; }
   .reasons .reason-more { display: none; }
+  .doc-text { max-height: none; overflow: visible; font-size: 7.5pt; }
   .meter { min-width: 0; }
   .meter-track { display: none; }  /* the percentage stays; the bar costs a column of width */
   .reveal, .meter-fill, .spec-bar i { animation: none !important; }
@@ -550,6 +551,8 @@ details.more > summary::-webkit-details-marker { display: none; }
 .port-inputs label { font-size: .78rem; }
 .segmented-wide { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .sizing-box { padding: 4px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.doc-text { white-space: pre-wrap; max-height: 320px; overflow: auto; }
+.doc summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .step-line { display: flex; gap: 8px; align-items: center; padding: 4px 10px; font-size: .84rem; color: var(--muted); border-left: 2px solid var(--border); margin-left: 6px; }
 .step-line .icon-sm { color: var(--good); flex: none; }
 .step-line.step-err .icon-sm { color: var(--crit); }

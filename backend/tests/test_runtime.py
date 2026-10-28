@@ -112,7 +112,7 @@ def test_what_is_sent_to_the_model(analysis, llm_env):
     assert names == {
         "get_evidence", "list_models", "get_model", "compare_models", "compute_requirements",
         "check_fit", "what_if", "baseline_run", "ask_user", "record_assumption", "record_evidence",
-        "submit_verdict",
+        "list_documents", "read_document", "submit_verdict",
     }  # fmt: skip
     sent = json.dumps([r["body"] for r in llm_env.requests])
     assert "corp.example.com" not in sent and "10.9.8.7" not in sent

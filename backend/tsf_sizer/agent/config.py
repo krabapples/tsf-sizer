@@ -20,7 +20,8 @@ Gateway variables (TSF_SIZER_GATEWAY_*):
   MAX_RETRIES  retries on timeouts, 429 and 5xx       (default 2)
   TOOL_MODE    native | json | auto                   (default auto)
 Direct mode: TSF_SIZER_DIRECT_URL, TSF_SIZER_DIRECT_MODEL, TSF_SIZER_DIRECT_API_KEY.
-Agent: TSF_SIZER_AGENT_MAX_STEPS (default 40).
+Agent: TSF_SIZER_AGENT_MAX_STEPS (default 40); TSF_SIZER_AGENT_ALLOW_DOCUMENTS (default true:
+the agent may read the text extracted from customer documents, identifiers masked).
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ class LLMConfig:
     max_retries: int = 2
     tool_mode: str = "auto"
     max_steps: int = DEFAULT_MAX_STEPS
+    allow_documents: bool = True
     problems: tuple = ()  # configuration mistakes found while reading the environment
 
     @property
@@ -121,6 +123,7 @@ def from_env(env: Mapping[str, str] | None = None) -> LLMConfig:
         _num(get("TSF_SIZER_AGENT_MAX_STEPS"), DEFAULT_MAX_STEPS, "AGENT_MAX_STEPS", problems)
     )
     max_steps = max(1, min(max_steps, 200))
+    allow_documents = _bool(get("TSF_SIZER_AGENT_ALLOW_DOCUMENTS"), True)
     if mode == "direct":
         return LLMConfig(
             mode=mode,
@@ -130,10 +133,16 @@ def from_env(env: Mapping[str, str] | None = None) -> LLMConfig:
             timeout_s=_num(get("TSF_SIZER_DIRECT_TIMEOUT_S"), 300.0, "DIRECT_TIMEOUT_S", problems),
             tool_mode=_tool_mode(get("TSF_SIZER_DIRECT_TOOL_MODE"), problems),
             max_steps=max_steps,
+            allow_documents=allow_documents,
             problems=tuple(problems),
         )
     if mode == "off":
-        return LLMConfig(mode="off", max_steps=max_steps, problems=tuple(problems))
+        return LLMConfig(
+            mode="off",
+            max_steps=max_steps,
+            allow_documents=allow_documents,
+            problems=tuple(problems),
+        )
 
     headers: dict = {}
     raw_headers = get("TSF_SIZER_GATEWAY_HEADERS")
@@ -172,6 +181,7 @@ def from_env(env: Mapping[str, str] | None = None) -> LLMConfig:
         ),
         tool_mode=_tool_mode(get("TSF_SIZER_GATEWAY_TOOL_MODE"), problems),
         max_steps=max_steps,
+        allow_documents=allow_documents,
         problems=tuple(problems),
     )
 
@@ -223,6 +233,7 @@ def status(cfg: LLMConfig, env: Mapping[str, str] | None = None) -> list[dict]:
             else []
         ),
         ("TSF_SIZER_AGENT_MAX_STEPS", str(cfg.max_steps)),
+        ("TSF_SIZER_AGENT_ALLOW_DOCUMENTS", "true" if cfg.allow_documents else "false"),
     ]
     return [
         {
