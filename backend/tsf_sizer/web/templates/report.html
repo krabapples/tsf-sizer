@@ -60,8 +60,9 @@
     </div>
   </div>
   <div class="hero-meta">
-    <span class="chip chip-glass">{{ icon('server', 'icon-sm') }}PAN-OS {{ h.panos or '–' }}</span>
-    <span class="chip chip-glass">{{ icon('clock', 'icon-sm') }}Uptime {{ h.uptime|num }} days</span>
+    {% if h.panos %}<span class="chip chip-glass">{{ icon('server', 'icon-sm') }}PAN-OS {{ h.panos }}</span>{% endif %}
+    {% if h.uptime is not none %}<span class="chip chip-glass">{{ icon('clock', 'icon-sm') }}Uptime {{ h.uptime|num }} days</span>{% endif %}
+    {% if r.input_mode == 'manual' %}<span class="chip chip-glass">{{ icon('list', 'icon-sm') }}No Tech Support File: figures entered by hand</span>{% endif %}
     <span class="chip chip-glass">{{ icon('layers', 'icon-sm') }}{{ h.ha }}</span>
     <span class="chip chip-glass">{{ icon('code', 'icon-sm') }}{{ h.config_source or 'no config' }}{% if h.panorama %} · Panorama-managed{% endif %}</span>
     <span class="chip chip-glass">{{ icon('gauge', 'icon-sm') }}Sized on {{ h.basis }} throughput</span>

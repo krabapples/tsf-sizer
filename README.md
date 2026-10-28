@@ -38,6 +38,10 @@ TSF_SIZER_PASSWORD=choose-a-password
 
 To keep the app reachable from this machine only, add `TSF_SIZER_BIND=127.0.0.1`. If other machines still cannot connect, check the host's firewall (e.g. `sudo ufw allow 8088/tcp`). For a shared team server, put a reverse proxy with HTTPS in front of it.
 
+### Without a Tech Support File
+
+Some customers cannot provide one. On the upload page choose **No file: I enter what I know**: give the current model and whatever you know (high availability, throughput and whether it is a peak, a typical value or an estimate, connections per second, concurrent sessions, interfaces in use by type, PoE, configuration counts), plus the same sizing input as for a file. Only the model is required. The analysis is marked as entered, not measured: nothing is guessed, a figure you leave out is listed as unverified, and the report says that CPU history, counters and licenses are unknown. With an LLM, the agent asks for the figures that matter most (peak throughput, sessions, interfaces, HA mode) and records your answers as evidence (`record_evidence`), then sizes as usual; it keeps its confidence at medium or lower unless the figures are peaks, and tells you to confirm with a Tech Support File before quoting.
+
 ### The agent (optional, needs an LLM through the AI gateway)
 
 Without an LLM the app gives a **quick result**: fixed rules applied to your assumptions, as before. With an LLM, every analysis also starts an **agent** that reasons with you before reaching a verdict:

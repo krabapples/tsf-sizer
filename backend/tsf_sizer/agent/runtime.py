@@ -266,6 +266,17 @@ def _run(conn, analysis_id: int, run_id: int, cfg: cfgmod.LLMConfig, client: Gat
                     res = {"id": "", "ok": False, "error": str(e), "args": tc.arguments}
                 if res["ok"] and res["payload"].get("change"):
                     _refresh_quick(conn, analysis_id)
+            elif tc.name == "record_evidence":
+                executed.append(tc)
+                try:
+                    a = validate(tc.arguments, SPEC_BY_NAME["record_evidence"]["parameters"])
+                    res = box.record_evidence(
+                        a["field"], a["value"], a.get("kind", "estimate"), a.get("note")
+                    )
+                except ToolError as e:
+                    res = {"id": "", "ok": False, "error": str(e), "args": tc.arguments}
+                if res["ok"]:
+                    _refresh_quick(conn, analysis_id)
             else:
                 executed.append(tc)
                 res = box.call(tc.name, tc.arguments)

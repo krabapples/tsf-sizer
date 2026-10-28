@@ -16,6 +16,7 @@ from typing import Any
 from ..portfolio import catalog
 from ..sizing import engine
 from ..sizing.engine import Requirement, SizingParams
+from ..tsf import manual
 from ..tsf.compare import resolve_port_media
 from ..tsf.metrics import TsfSummary
 from . import ledger
@@ -185,6 +186,27 @@ SPECS: list[dict] = [
                 "reason": {"type": "string"},
             },
             "required": ["key", "value", "reason"],
+        },
+    },
+    {
+        "name": "record_evidence",
+        "description": (
+            "Only for an analysis without a Tech Support File: add a figure the engineer gave "
+            "you about the current firewall. Never use it for a guess of your own. fields: "
+            + ", ".join(manual.FIELDS)
+            + '. ports takes {class: count} such as {"1G_RJ45": 8}; ha_mode is standalone, '
+            "active-passive or active-active; kind says whether a performance figure is a "
+            "peak, a typical value or an estimate."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "field": {"type": "string", "enum": list(manual.FIELDS)},
+                "value": {},
+                "kind": {"type": "string", "enum": list(manual.KINDS)},
+                "note": {"type": "string"},
+            },
+            "required": ["field", "value"],
         },
     },
     {
@@ -389,6 +411,37 @@ class Toolbox:
         payload = {"change": change, "unchanged": change is None, "key": key}
         return self._store("record_assumption", {"key": key, "value": value}, payload, None)
 
+    @property
+    def manual(self) -> bool:
+        return self.result.get("input_mode") == "manual"
+
+    def record_evidence(self, field: str, value, kind: str = "estimate", note: str | None = None):
+        """Add an entered figure to a manual analysis and size the quick result again."""
+        args = {"field": field, "value": value, "kind": kind}
+        if not self.manual:
+            return self._store(
+                "record_evidence",
+                args,
+                None,
+                "This analysis was made from a Tech Support File: its evidence cannot be changed",
+            )
+        try:
+            summary = TsfSummary.from_dict(self.result["summary"])
+            what = manual.apply_field(self.conn, summary, field, value, kind, note)
+        except ValueError as e:
+            return self._store("record_evidence", args, None, str(e))
+        self.result["summary"] = summary.to_dict()
+        self.conn.execute(
+            "UPDATE analysis SET result_json=? WHERE id=?",
+            (json.dumps(self.result, default=str), self.analysis_id),
+        )
+        self.conn.commit()
+        self.summary = summary
+        self.current = summary.model
+        return self._store(
+            "record_evidence", args, {"recorded": what, "field": field, "value": value}, None
+        )
+
     # -- helpers
 
     def _doc_id(self) -> int:
@@ -472,8 +525,13 @@ class Toolbox:
                 "config_source": s.config_source,
                 "poe_in_use": bool((s.poe or {}).get("ports_in_use")),
                 "in_capacity_workbook": self._current_caps() is not None,
-                "source": "Tech Support File",
+                "source": "entered by the engineer (no Tech Support File)"
+                if self.manual
+                else "Tech Support File",
+                "input_mode": "manual" if self.manual else "tsf",
             }
+            if self.manual:
+                out["overview"]["not_provided"] = manual.missing(s)
         if "usage" in want:
             caps = self._current_caps() or {}
             labels = self._labels()
@@ -1021,6 +1079,8 @@ def summarize(tool: str, args: dict, payload: dict | None, error: str | None = N
     if tool == "baseline_run":
         rec = (p.get("recommended") or {}).get("model")
         return f"Quick result: {rec or 'no model meets every rule'}"
+    if tool == "record_evidence":
+        return f"Evidence: {p.get('recorded')}"
     if tool == "record_assumption":
         ch = p.get("change")
         return f"Ledger: {args.get('key')} = {args.get('value')}" if ch else "Ledger: no change"

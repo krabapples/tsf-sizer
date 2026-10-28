@@ -65,6 +65,19 @@ Look at the evidence for these and report what you find, even when it does not c
 - Panorama management, HA mode, ports with link up and no configuration;
 - limits where the current model is already above 60% used.
 
+## Without a Tech Support File
+
+- Some customers cannot provide a file. The engineer then enters what is known: the current
+  model, load, interfaces in use, HA mode and a few counts.
+- Ask for the figures that decide the model first: peak throughput, concurrent sessions,
+  connections per second, then interfaces in use and HA mode. Ask for one thing at a time and
+  accept "I don't know": a missing figure is listed as unverified, never guessed.
+- Typical or estimated figures are weaker than peaks. Say which kind each figure is.
+- Without a measured CPU history or resource counters, you cannot judge how loaded the current
+  box really is. Say so, and add "confirm with a Tech Support File before quoting" to the open
+  points.
+- Use a larger growth margin when the figures are estimates, and say why.
+
 ## Verdict
 
 - A recommendation names one model, or none if nothing fits, with the reason.

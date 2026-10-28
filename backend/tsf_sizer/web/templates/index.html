@@ -20,7 +20,12 @@
 </div>
 {% endif %}
 
-<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="upload-single">
+<div class="mode-switch no-print" role="tablist" aria-label="How do you want to size?">
+  <button type="button" role="tab" data-mode-tab="tsf">{{ icon('upload', 'icon-sm') }}I have a Tech Support File</button>
+  <button type="button" role="tab" data-mode-tab="manual">{{ icon('list', 'icon-sm') }}No file: I enter what I know</button>
+</div>
+
+<form method="post" action="/analyses" enctype="multipart/form-data" id="upload-form" class="upload-single mode-panel" data-mode="tsf">
   <section class="card hero-upload reveal" aria-labelledby="upload-h">
     <div class="steps" aria-hidden="true"><span><b>1</b> Sizing input</span><span><b>2</b> Upload TSF</span><span><b>3</b> Reason with the agent</span></div>
     <h2 id="upload-h" class="sr-only">Sizing input and upload</h2>
@@ -28,7 +33,7 @@
     <div class="stack sizing-box">
       <p class="eyebrow">Step 1 · Before the analysis</p>
       <p class="hint" style="margin-top:-4px">Tell us what the customer needs. It shapes the first result and the questions the agent does not have to ask.</p>
-      {% include "_sizing_input.html" %}
+      {% set pfx = 'tsf-' %}{% include "_sizing_input.html" %}
     </div>
 
     <p class="eyebrow" style="margin-top:6px">Step 2 · The Tech Support File</p>
@@ -64,6 +69,35 @@
 
 </form>
 
+<form method="post" action="/analyses/manual" id="manual-form" class="upload-single mode-panel" data-mode="manual">
+  <section class="card hero-upload reveal" aria-labelledby="manual-h">
+    <div class="steps" aria-hidden="true"><span><b>1</b> The current firewall</span><span><b>2</b> Sizing input</span><span><b>3</b> Reason with the agent</span></div>
+    <h2 id="manual-h" class="sr-only">Sizing without a Tech Support File</h2>
+
+    <div class="stack sizing-box">
+      <p class="eyebrow">Step 1 · What you know about the current firewall</p>
+      <p class="hint" style="margin-top:-4px">Only the model is required. Everything else is optional: the agent asks for what it needs, and a figure you do not know is listed as unverified, never guessed.</p>
+      {% include "_manual_input.html" %}
+    </div>
+
+    <div class="stack sizing-box">
+      <p class="eyebrow">Step 2 · Before the analysis</p>
+      <p class="hint" style="margin-top:-4px">Tell us what the customer needs. It shapes the first result and the questions the agent does not have to ask.</p>
+      {% set pfx = 'm-' %}{% set hide_peaks = true %}{% include "_sizing_input.html" %}
+    </div>
+
+    <div class="field">
+      <label for="m-customer">Customer / opportunity <span class="opt">optional</span></label>
+      <input id="m-customer" name="customer" type="text" maxlength="200" autocomplete="off" placeholder="e.g. ACME – branch refresh">
+    </div>
+
+    <div>
+      <button type="submit" class="btn btn-primary btn-lg">{{ icon('sparkles') }}<span>Start the sizing</span></button>
+      <span class="muted small" style="margin-left:10px">No file is uploaded. The figures are marked as entered, not measured.</span>
+    </div>
+  </section>
+</form>
+
 <section class="card reveal" aria-labelledby="hist-h" id="history">
   <div class="card-head">
     <div class="section-title" style="margin:0"><span class="icon-bubble">{{ icon('history') }}</span><div><h2 id="hist-h">Recent analyses</h2><p class="muted small">Newest first</p></div></div>
@@ -90,4 +124,18 @@
   <div class="empty">{{ icon('layers', 'icon-lg') }}<p>No analyses yet. Upload a TSF to get the first report.</p></div>
   {% endif %}
 </section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var tabs = document.querySelectorAll('[data-mode-tab]'), panels = document.querySelectorAll('.mode-panel');
+  function show(mode) {
+    panels.forEach(function (p) { p.hidden = p.dataset.mode !== mode; });
+    tabs.forEach(function (t) { var on = t.dataset.modeTab === mode; t.classList.toggle('active', on); t.setAttribute('aria-selected', on); });
+    try { history.replaceState(null, '', mode === 'manual' ? '#manual' : location.pathname); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.modeTab); }); });
+  show(location.hash === '#manual' ? 'manual' : 'tsf');
+})();
+</script>
 {% endblock %}

@@ -69,6 +69,19 @@ def analyze(
     }
 
 
+def manual_result(conn: sqlite3.Connection, summary: TsfSummary, params: SizingParams) -> dict:
+    """The stored result of an analysis made from entered figures instead of a TSF."""
+    return {
+        "source": "Manual input",
+        "input_mode": "manual",
+        "files_used": {},
+        "summary": summary.to_dict(),
+        "facts": {},
+        "config": None,
+        **_size_summary(conn, summary, params),
+    }
+
+
 def _size_summary(conn: sqlite3.Connection, summary: TsfSummary, params: SizingParams) -> dict:
     """The part of a result that depends on the portfolio and the sizing assumptions."""
     doc = catalog.active_document(conn)

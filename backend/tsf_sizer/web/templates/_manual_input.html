@@ -1,0 +1,82 @@
+{# What the engineer knows about the current firewall when there is no Tech Support File.
+   Needs: current_models, port_classes #}
+{% from "_icons.html" import icon %}
+<div class="field">
+  <label for="m-model">Current firewall model</label>
+  <input id="m-model" name="model" type="text" list="m-model-list" required maxlength="60" autocomplete="off" spellcheck="false" placeholder="e.g. PA-3220">
+  <datalist id="m-model-list">{% for m in current_models %}<option value="{{ m.name }}">{{ m.family or '' }}</option>{% endfor %}</datalist>
+  <p class="hint">Models in the active capacity workbook, and the older PA-800, PA-3200 and PA-5200 series.</p>
+</div>
+
+<div class="grid-2" style="gap:14px">
+  <div class="field">
+    <label for="m-ha">High availability</label>
+    <select id="m-ha" name="ha_mode">
+      <option value="">Don't know</option>
+      <option value="standalone">Standalone</option>
+      <option value="active-passive">Active-passive pair</option>
+      <option value="active-active">Active-active pair</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="m-basis">Traffic inspected with</label>
+    <select id="m-basis" name="sizing_basis">
+      <option value="threat_prevention">Threat prevention (default)</option>
+      <option value="app_id">App-ID firewall only</option>
+    </select>
+  </div>
+</div>
+
+<fieldset class="field" style="border:0;padding:0;margin:0">
+  <legend class="label" style="margin-bottom:8px">Load</legend>
+  <div class="grid-2" style="gap:14px">
+    <div class="field">
+      <label for="m-throughput">Throughput <span class="opt">optional</span></label>
+      <div class="input-suffix"><input id="m-throughput" name="throughput_mbps" type="text" inputmode="decimal" placeholder="e.g. 1800"><span>Mbps</span></div>
+    </div>
+    <div class="field">
+      <label for="m-kind">The throughput is a</label>
+      <select id="m-kind" name="throughput_kind">
+        <option value="peak">Peak (from monitoring)</option>
+        <option value="typical">Typical value</option>
+        <option value="estimate" selected>Estimate</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="m-cps">New connections per second <span class="opt">optional</span></label>
+      <div class="input-suffix"><input id="m-cps" name="cps" type="text" inputmode="numeric"><span>/s</span></div>
+    </div>
+    <div class="field">
+      <label for="m-sessions">Concurrent sessions, peak <span class="opt">optional</span></label>
+      <input id="m-sessions" name="sessions" type="text" inputmode="numeric">
+    </div>
+  </div>
+  <p class="hint">From monitoring, <code>show session info</code> or the customer's own estimate. Leave out what you do not know: the agent asks for what matters.</p>
+</fieldset>
+
+<fieldset class="field" style="border:0;padding:0;margin:0">
+  <legend class="label" style="margin-bottom:8px">Interfaces in use</legend>
+  <div class="port-inputs">
+    {% for cls in port_classes %}
+    <div class="field"><label for="m-ports-{{ loop.index }}">{{ cls.replace('_', ' ') }}</label><input id="m-ports-{{ loop.index }}" name="ports_{{ cls }}" type="number" min="0" max="64" step="1" inputmode="numeric" placeholder="0"></div>
+    {% endfor %}
+  </div>
+  <p class="hint">How many ports of each type are connected and used.</p>
+</fieldset>
+
+<label class="switch-row" for="m-poe">
+  <span class="text">
+    <strong>PoE devices are powered by the firewall</strong>
+    <span class="hint">Only models with PoE ports then qualify.</span>
+  </span>
+  <span class="switch"><input id="m-poe" name="poe_in_use" type="checkbox" value="1" role="switch"><span class="track"></span></span>
+</label>
+
+<details class="disclosure">
+  <summary><span>Configuration counts <span class="opt">optional</span></span>{{ icon('chevron-down', 'icon chev') }}</summary>
+  <div class="body grid-3" style="gap:14px">
+    {% for key, label in count_fields %}
+    <div class="field"><label for="m-c-{{ key }}">{{ label }}</label><input id="m-c-{{ key }}" name="{{ key }}" type="text" inputmode="numeric"></div>
+    {% endfor %}
+  </div>
+</details>

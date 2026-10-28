@@ -65,11 +65,15 @@ def build(result: dict, row: dict) -> dict:
         "panos": s.get("panos"),
         "uptime": s.get("uptime_days"),
         "ha": (
-            f"{ha.get('mode')} · {ha.get('local_state')} · HA1 {ha.get('ha1_interface')}, "
-            f"HA2 {ha.get('ha2_interface')}"
+            (
+                f"{ha.get('mode')} · {ha.get('local_state')} · HA1 {ha.get('ha1_interface')}, "
+                f"HA2 {ha.get('ha2_interface')}"
+            )
+            if ha.get("local_state")
+            else str(ha.get("mode"))
         )
         if ha.get("enabled")
-        else "Standalone",
+        else ("Standalone" if ha else "HA not given"),
         "panorama": s.get("panorama_managed"),
         "config_source": s.get("config_source"),
         "basis": s.get("sizing_basis", "").replace("_", " "),

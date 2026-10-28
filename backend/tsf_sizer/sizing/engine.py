@@ -247,12 +247,18 @@ def build_requirements(
         obs, basis = params.peak_throughput_mbps, "entered peak"
     else:
         cands = [
-            (m[k].value, m[k].kind)
+            (m[k].value, m[k].kind, m[k].source)
             for k in ("perf.throughput_snapshot_mbps", "perf.throughput_avg_since_boot_mbps")
             if k in m and m[k].value is not None
         ]
-        obs, basis = max(cands) if cands else (None, None)
-        if obs is not None:
+        obs, basis, source = max(cands) if cands else (None, None, "")
+        if obs is not None and source.startswith("entered"):
+            if basis != "peak":
+                notes.append(
+                    f"Throughput requirement is based on a {basis} value entered by the "
+                    "engineer; enter the known peak for a reliable result."
+                )
+        elif obs is not None:
             notes.append(
                 "Throughput requirement is based on a TSF " + basis + " value; enter "
                 "the known peak for a reliable result."

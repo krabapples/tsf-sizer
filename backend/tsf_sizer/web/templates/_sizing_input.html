@@ -1,6 +1,8 @@
 {# What the engineer knows before the analysis. These answers go into the assumptions ledger
    (source: form) and to the agent, so neither asks again. #}
 {% from "_icons.html" import icon %}
+{% set pfx = pfx|default("") %}
+{% set hide_peaks = hide_peaks|default(false) %}
 <fieldset class="field sizing-input" style="border:0;padding:0;margin:0">
   <legend class="label" style="margin-bottom:8px">What does the customer want?</legend>
   <div class="segmented segmented-wide">
@@ -19,52 +21,54 @@
 </fieldset>
 
 <div class="field">
-  <label for="port_add_text">Extra ports needed <span class="opt">optional</span></label>
-  <input id="port_add_text" name="port_add_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. 10G_SFP+=2, 1G_RJ45=4">
+  <label for="{{ pfx }}port_add_text">Extra ports needed <span class="opt">optional</span></label>
+  <input id="{{ pfx }}port_add_text" name="port_add_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. 10G_SFP+=2, 1G_RJ45=4">
   <p class="hint">On top of today's layout: port class = count, separated by commas.</p>
 </div>
 
 <div class="grid-2" style="gap:14px">
   <div class="field">
-    <label for="growth_pct">Growth per year</label>
-    <div class="input-suffix"><input id="growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}"><span>%</span></div>
+    <label for="{{ pfx }}growth_pct">Growth per year</label>
+    <div class="input-suffix"><input id="{{ pfx }}growth_pct" name="growth_pct" type="number" min="0" max="200" step="1" value="{{ defaults.growth_pct_per_year|int }}"><span>%</span></div>
   </div>
   <div class="field">
-    <label for="years">Planning horizon</label>
-    <div class="input-suffix"><input id="years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}"><span>years</span></div>
+    <label for="{{ pfx }}years">Planning horizon</label>
+    <div class="input-suffix"><input id="{{ pfx }}years" name="years" type="number" min="1" max="10" step="1" value="{{ defaults.years }}"><span>years</span></div>
+  </div>
+  {% if not hide_peaks %}
+  <div class="field">
+    <label for="{{ pfx }}peak_throughput_mbps">Known peak throughput <span class="opt">optional</span></label>
+    <div class="input-suffix"><input id="{{ pfx }}peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring"><span>Mbps</span></div>
   </div>
   <div class="field">
-    <label for="peak_throughput_mbps">Known peak throughput <span class="opt">optional</span></label>
-    <div class="input-suffix"><input id="peak_throughput_mbps" name="peak_throughput_mbps" type="text" inputmode="decimal" placeholder="from monitoring"><span>Mbps</span></div>
-  </div>
-  <div class="field">
-    <label for="peak_cps">Known peak connections <span class="opt">optional</span></label>
-    <div class="input-suffix"><input id="peak_cps" name="peak_cps" type="text" inputmode="numeric"><span>/s</span></div>
+    <label for="{{ pfx }}peak_cps">Known peak connections <span class="opt">optional</span></label>
+    <div class="input-suffix"><input id="{{ pfx }}peak_cps" name="peak_cps" type="text" inputmode="numeric"><span>/s</span></div>
   </div>
   <p class="hint" style="grid-column:1/-1">The Tech Support File only has a throughput snapshot. A known peak gives a far better result.</p>
+  {% endif %}
 </div>
 
-<label class="switch-row" for="need_poe">
+<label class="switch-row" for="{{ pfx }}need_poe">
   <span class="text">
     <strong>Customer needs PoE</strong>
     <span class="hint">Off: dedicated PoE models are not recommended. On: only models with PoE ports qualify. Switched on automatically when the current firewall powers PoE devices.</span>
   </span>
-  <span class="switch"><input id="need_poe" name="need_poe" type="checkbox" value="1" role="switch"><span class="track"></span></span>
+  <span class="switch"><input id="{{ pfx }}need_poe" name="need_poe" type="checkbox" value="1" role="switch"><span class="track"></span></span>
 </label>
 
 <div class="field">
-  <label for="notes">Anything else the agent should know <span class="opt">optional</span></label>
-  <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="e.g. Branch office, 200 users, moving to SD-WAN next year. Budget is tight."></textarea>
+  <label for="{{ pfx }}notes">Anything else the agent should know <span class="opt">optional</span></label>
+  <textarea id="{{ pfx }}notes" name="notes" rows="3" maxlength="1000" placeholder="e.g. Branch office, 200 users, moving to SD-WAN next year. Budget is tight."></textarea>
   <p class="hint">The agent reads this before it looks at the Tech Support File. Do not put customer names or addresses here.</p>
 </div>
 
 {% if superseded %}
-<label class="switch-row" for="include_superseded">
+<label class="switch-row" for="{{ pfx }}include_superseded">
   <span class="text">
     <strong>Include previous-generation models</strong>
     <span class="hint">{% for fam, succ in superseded.items() %}{{ fam }} series, succeeded by {{ succ }}{% if not loop.last %}; {% endif %}{% endfor %}. Off: only the current generation is recommended.</span>
   </span>
-  <span class="switch"><input id="include_superseded" name="include_superseded" type="checkbox" value="1" role="switch"><span class="track"></span></span>
+  <span class="switch"><input id="{{ pfx }}include_superseded" name="include_superseded" type="checkbox" value="1" role="switch"><span class="track"></span></span>
 </label>
 {% endif %}
 
@@ -72,12 +76,12 @@
   <summary><span>Models to include or leave out</span>{{ icon('chevron-down', 'icon chev') }}</summary>
   <div class="body grid-2" style="gap:14px">
     <div class="field">
-      <label for="only_models_text">Only consider</label>
-      <input id="only_models_text" name="only_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-3500">
+      <label for="{{ pfx }}only_models_text">Only consider</label>
+      <input id="{{ pfx }}only_models_text" name="only_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-3500">
     </div>
     <div class="field">
-      <label for="exclude_models_text">Leave out</label>
-      <input id="exclude_models_text" name="exclude_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-5400, variant:5G">
+      <label for="{{ pfx }}exclude_models_text">Leave out</label>
+      <input id="{{ pfx }}exclude_models_text" name="exclude_models_text" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="e.g. PA-5400, variant:5G">
     </div>
     <p class="hint" style="grid-column:1/-1">Model or family names separated by commas. <code>variant:5G</code>, <code>variant:rugged</code> and <code>variant:poe</code> leave out a kind of model.</p>
   </div>

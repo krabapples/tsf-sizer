@@ -35,11 +35,12 @@ from .. import db
 from ..agent import config as llm_config
 from ..agent import ledger, playbook, runtime
 from ..agent.gateway import GatewayClient, GatewayError
-from ..pipeline import refresh_quick_result, run_job
+from ..pipeline import manual_result, refresh_quick_result, run_job
 from ..portfolio import catalog
 from ..portfolio.importer import AlreadyImportedError, activate, import_workbook
 from ..portfolio.supplements import apply_to_all_documents
 from ..sizing.engine import SizingParams
+from ..tsf import manual
 from . import agent_view
 from . import report as report_view
 
@@ -171,9 +172,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         with conn() as c:
             superseded = catalog.superseded_families(c)
         llm = llm_config.from_env()
+        with conn() as c:
+            current_models = [
+                dict(r)
+                for r in c.execute(
+                    "SELECT DISTINCT m.name, m.family FROM model m "
+                    "JOIN capacity_value v ON v.model_id = m.id "
+                    "JOIN source_document d ON d.id = v.document_id AND d.is_active = 1 "
+                    "WHERE m.kind != 'component' ORDER BY m.family, m.name"
+                )
+            ]
         return render(
             request,
             "index.html",
+            current_models=current_models,
+            port_classes=manual_port_classes,
+            count_fields=[(k, v[1]) for k, v in manual.COUNT_FIELDS.items()],
             superseded=superseded,
             llm=llm,
             portfolio=doc,
@@ -314,6 +328,67 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             config_name,
             lambda aid: start_agent(aid, notes=notes or None),
         )
+        return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
+
+    manual_port_classes = [
+        "1G_RJ45", "2.5G_RJ45", "5G_RJ45", "10G_RJ45", "1G_SFP", "10G_SFP+", "25G_SFP28",
+        "40G_QSFP+", "100G_QSFP28",
+    ]  # fmt: skip
+
+    @app.post("/analyses/manual")
+    async def create_manual_analysis(request: Request):
+        """An analysis without a Tech Support File: the engineer enters what is known."""
+        form = await request.form()
+        data = {k: v for k, v in form.items() if isinstance(v, str)}
+
+        def num(key: str, default: float) -> float:
+            raw = data.get(key, "").strip().replace(",", "")
+            if not raw:
+                return default
+            try:
+                return float(raw)
+            except ValueError:
+                raise HTTPException(400, f"'{raw}' is not a number for {key}") from None
+
+        notes = data.get("notes", "").strip()
+        if len(notes) > 1000:
+            raise HTTPException(400, "The notes are limited to 1000 characters")
+        growth, years = num("growth_pct", 20.0), int(num("years", 3))
+        params = build_params(
+            growth,
+            years,
+            num("target_util_pct", 70.0),
+            data.get("peak_throughput_mbps", ""),
+            data.get("peak_cps", ""),
+            data.get("peak_sessions", ""),
+            data.get("port_rule", "all"),
+            data.get("include_superseded", ""),
+            data.get("need_poe", ""),
+            num("max_size_factor", 5.0),
+            data.get("goal", "match_or_beat"),
+            data.get("optics", "keep"),
+            data.get("port_add_text", ""),
+            data.get("only_models_text", ""),
+            data.get("exclude_models_text", ""),
+        )
+        try:
+            with conn() as c:
+                summary = manual.build_summary(c, data)
+                result = manual_result(c, summary, params)
+                cur = c.execute(
+                    "INSERT INTO analysis (customer, filename, status, params_json, result_json, "
+                    "finished_at) VALUES (?, 'Manual input', 'done', ?, ?, datetime('now'))",
+                    (
+                        data.get("customer", "").strip()[:200] or None,
+                        json.dumps(params.__dict__),
+                        json.dumps(result, default=str),
+                    ),
+                )
+                analysis_id = cur.lastrowid
+                ledger.seed(c, analysis_id, params)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        start_agent(analysis_id, notes=notes or None)
         return RedirectResponse(f"/analyses/{analysis_id}", status_code=303)
 
     def start_agent(
